@@ -5,10 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=root
-WorkingDirectory=/opt/pi_a_acquirer
-EnvironmentFile=/opt/pi_a_acquirer/.env
-ExecStart=/root/.local/bin/uv run --frozen python acquirer.py
+User=pieeg
+Group=pieeg
+SupplementaryGroups=spi gpio
+WorkingDirectory=/home/pieeg/Documents/eeg_roomba/pi_a_acquirer
+EnvironmentFile=/home/pieeg/Documents/eeg_roomba/pi_a_acquirer/.env
+ExecStart=/home/pieeg/.local/bin/uv run --frozen python acquirer.py
 Restart=on-failure
 RestartSec=2
 Nice=-10
