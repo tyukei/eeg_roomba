@@ -31,8 +31,14 @@ services:
   ingest:
     build: ./services/ingest
     restart: unless-stopped
+    # host networking is required for LSL multicast discovery
     network_mode: host
     env_file: .env
+    environment:
+      # On host network, container-network DNS names don't resolve.
+      # timescaledb/mosquitto publish their ports on host, so use localhost.
+      POSTGRES_HOST: localhost
+      MQTT_HOST: localhost
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -60,8 +66,9 @@ services:
   api:
     build: ./services/api
     restart: unless-stopped
-    network_mode: host
     env_file: .env
+    ports:
+      - "8080:8080"
     depends_on:
       timescaledb:
         condition: service_healthy
