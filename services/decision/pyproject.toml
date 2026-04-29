@@ -1,0 +1,12 @@
+[project]
+name = "decision-svc"
+version = "0.1.0"
+description = "alpha threshold + hysteresis -> Roomba HTTP control"
+requires-python = ">=3.12"
+dependencies = [
+  "paho-mqtt>=1.6,<2",
+  "httpx>=0.27",
+]
+
+[tool.uv]
+package = false

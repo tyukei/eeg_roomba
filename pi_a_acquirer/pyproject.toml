@@ -1,0 +1,14 @@
+[project]
+name = "pi-a-acquirer"
+version = "0.1.0"
+description = "PiEEG-16 SPI -> LSL outlet + MQTT health beacon"
+requires-python = ">=3.11"
+dependencies = [
+  "pylsl>=1.16",
+  "paho-mqtt>=1.6,<2",
+  "spidev>=3.6",
+  "gpiod>=1.5",
+]
+
+[tool.uv]
+package = false

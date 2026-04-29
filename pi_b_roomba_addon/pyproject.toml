@@ -1,0 +1,12 @@
+[project]
+name = "pi-b-roomba-addon"
+version = "0.1.0"
+description = "Roomba state -> MQTT bridge"
+requires-python = ">=3.11"
+dependencies = [
+  "paho-mqtt>=1.6,<2",
+  "httpx>=0.27",
+]
+
+[tool.uv]
+package = false

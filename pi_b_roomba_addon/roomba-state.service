@@ -1,0 +1,16 @@
+[Unit]
+Description=Roomba state -> MQTT bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/pi_b_roomba_addon
+EnvironmentFile=/opt/pi_b_roomba_addon/.env
+ExecStart=/home/pi/.local/bin/uv run --frozen python mqtt_state_publisher.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

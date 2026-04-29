@@ -1,0 +1,17 @@
+[Unit]
+Description=PiEEG-16 acquisition (SPI -> LSL + MQTT)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/pi_a_acquirer
+EnvironmentFile=/opt/pi_a_acquirer/.env
+ExecStart=/root/.local/bin/uv run --frozen python acquirer.py
+Restart=on-failure
+RestartSec=2
+Nice=-10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+[project]
+name = "ingest-svc"
+version = "0.1.0"
+description = "LSL -> TimescaleDB + MQTT chunk fan-out"
+requires-python = ">=3.12"
+dependencies = [
+  "pylsl>=1.16",
+  "asyncpg>=0.29",
+  "paho-mqtt>=1.6,<2",
+  "numpy>=1.26",
+]
+
+[tool.uv]
+package = false

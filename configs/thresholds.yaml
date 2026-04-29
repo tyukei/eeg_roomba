@@ -1,0 +1,9 @@
+alpha:
+  enter: 10.0
+  exit: 6.0
+  dwell_ms: 500
+  channels: [6, 7]
+
+roomba:
+  on_enter: { cmd: "0", duration_ms: 1500 }
+  on_exit:  { cmd: "stop" }
