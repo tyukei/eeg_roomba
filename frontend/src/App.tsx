@@ -149,12 +149,24 @@ export default function App() {
 
         <h2 style={{ marginTop: 16 }}>Manual control</h2>
         <div className="row" style={{ flexWrap: "wrap" }}>
-          <button className="btn" onClick={() => cmd("0")}>Forward</button>
-          <button className="btn" onClick={() => cmd("3")}>Back</button>
-          <button className="btn" onClick={() => cmd("2")}>Left</button>
-          <button className="btn" onClick={() => cmd("1")}>Right</button>
+          <button className="btn" onClick={() => cmd("forward")}>Forward</button>
+          <button className="btn" onClick={() => cmd("back")}>Back</button>
+          <button className="btn" onClick={() => cmd("left")}>Left</button>
+          <button className="btn" onClick={() => cmd("right")}>Right</button>
           <button className="btn stop" onClick={() => cmd("stop")}>Stop</button>
         </div>
+
+        <h2 style={{ marginTop: 16 }}>Camera</h2>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn" onClick={() => fetch(`${API_BASE}/camera/start`, { method: "POST" })}>Start</button>
+          <button className="btn stop" onClick={() => fetch(`${API_BASE}/camera/stop`, { method: "POST" })}>Stop</button>
+        </div>
+        <img
+          src={`${API_BASE}/camera/stream`}
+          alt="camera"
+          style={{ marginTop: 8, width: "100%", maxWidth: 640, borderRadius: 4 }}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+        />
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import httpx
 import paho.mqtt.client as mqtt
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 log = logging.getLogger("api")
 
@@ -107,11 +108,41 @@ async def history_alpha(seconds: int = 60, ch: int | None = None) -> list[dict[s
 @app.post("/control/{cmd}")
 async def proxy_control(cmd: str) -> dict[str, Any]:
     try:
-        r = await app.state.http.post(f"{ROOMBA_BASE}/move/{cmd}", timeout=2.0)
+        r = await app.state.http.post(f"{ROOMBA_BASE}/command/{cmd}", timeout=2.0)
         r.raise_for_status()
         return {"ok": True, "cmd": cmd}
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+@app.post("/camera/start")
+async def camera_start() -> dict[str, Any]:
+    try:
+        r = await app.state.http.post(f"{ROOMBA_BASE}/camera/start", timeout=5.0)
+        r.raise_for_status()
+        return r.json()
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@app.post("/camera/stop")
+async def camera_stop() -> dict[str, Any]:
+    try:
+        r = await app.state.http.post(f"{ROOMBA_BASE}/camera/stop", timeout=5.0)
+        r.raise_for_status()
+        return r.json()
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@app.get("/camera/stream")
+async def camera_stream():
+    async def _gen():
+        async with httpx.AsyncClient() as client:
+            async with client.stream("GET", f"{ROOMBA_BASE}/camera/stream", timeout=None) as r:
+                async for chunk in r.aiter_bytes(4096):
+                    yield chunk
+    return StreamingResponse(_gen(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
 @app.post("/threshold")
