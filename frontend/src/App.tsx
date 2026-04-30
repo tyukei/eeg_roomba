@@ -84,7 +84,7 @@ export default function App() {
         width: 1,
       })),
     ],
-    axes: [{}, {}],
+    axes: [{}, { size: 80 }],
   }), []);
 
   const setThresh = async (patch: Partial<State["threshold"]>) => {

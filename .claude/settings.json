@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s https://raw.githubusercontent.com/pieeg-club/PiEEG-16/main/GUI/2.Graph_Gpio_D%20_1_5_4_OS.py)"
+    ]
+  }
+}

@@ -28,19 +28,27 @@ def _open_spi(bus: int) -> spidev.SpiDev:
     return spi
 
 
-def _init_chip(spi: spidev.SpiDev) -> None:
-    # Reset + stop continuous + write registers
-    spi.xfer2([0x06])  # RESET
-    spi.xfer2([0x11])  # SDATAC
+def _init_chip(spi: spidev.SpiDev, cs_line=None) -> None:
+    # Chip B needs the GPIO19 cs_line gated around every SPI op; chip A doesn't.
+    def xfer(buf: list[int]) -> None:
+        if cs_line is not None:
+            cs_line.set_value(0)
+            spi.xfer2(buf)
+            cs_line.set_value(1)
+        else:
+            spi.xfer2(buf)
+
+    xfer([0x06])  # RESET
+    xfer([0x11])  # SDATAC
     # CONFIG1=0x96 (250 SPS), CONFIG2=0xD4, CONFIG3=0xFF
-    spi.xfer2([0x41, 0x00, 0x96])
-    spi.xfer2([0x42, 0x00, 0xD4])
-    spi.xfer2([0x43, 0x00, 0xFF])
+    xfer([0x41, 0x00, 0x96])
+    xfer([0x42, 0x00, 0xD4])
+    xfer([0x43, 0x00, 0xFF])
     # All channels normal input gain 24 (0x60)
     for reg in range(0x05, 0x0D):
-        spi.xfer2([0x40 | reg, 0x00, 0x60])
-    spi.xfer2([0x10])  # RDATAC
-    spi.xfer2([0x08])  # START
+        xfer([0x40 | reg, 0x00, 0x60])
+    xfer([0x10])  # RDATAC
+    xfer([0x08])  # START
 
 
 def _decode_frame(buf: bytes) -> list[float]:
@@ -72,7 +80,7 @@ class PiEEG16:
         self.cs_line = chip.get_line(_CS_LINE)
         self.cs_line.request(consumer="pieeg-cs", type=gpiod.LINE_REQ_DIR_OUT)
         _init_chip(self.spi_a)
-        _init_chip(self.spi_b)
+        _init_chip(self.spi_b, self.cs_line)
         self.stats = FrameStats()
 
     def read_sample(self) -> list[float]:
