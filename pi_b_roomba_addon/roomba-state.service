@@ -6,13 +6,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=pi
-<<<<<<< HEAD
-WorkingDirectory=/opt/eeg_roomba/pi_b_roomba_addon
-EnvironmentFile=/opt/eeg_roomba/pi_b_roomba_addon/.env
-=======
 WorkingDirectory=/home/pi/Documents/eeg_roomba/pi_b_roomba_addon
 EnvironmentFile=/home/pi/Documents/eeg_roomba/pi_b_roomba_addon/.env
->>>>>>> 2798bd6 (fix: roomba-state.service のパスを実際の配置先に修正)
 ExecStart=/home/pi/.local/bin/uv run --frozen python mqtt_state_publisher.py
 Restart=on-failure
 RestartSec=2
