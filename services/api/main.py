@@ -137,12 +137,23 @@ async def camera_stop() -> dict[str, Any]:
 
 @app.get("/camera/stream")
 async def camera_stream():
+    req = app.state.http.build_request("GET", f"{ROOMBA_BASE}/camera/stream")
+    upstream = await app.state.http.send(req, stream=True)
+    if upstream.status_code != 200:
+        await upstream.aclose()
+        raise HTTPException(status_code=502, detail="camera upstream not ready")
+    media_type = upstream.headers.get(
+        "content-type", "multipart/x-mixed-replace; boundary=frame"
+    )
+
     async def _gen():
-        async with httpx.AsyncClient() as client:
-            async with client.stream("GET", f"{ROOMBA_BASE}/camera/stream", timeout=None) as r:
-                async for chunk in r.aiter_bytes(4096):
-                    yield chunk
-    return StreamingResponse(_gen(), media_type="multipart/x-mixed-replace; boundary=frame")
+        try:
+            async for chunk in upstream.aiter_raw():
+                yield chunk
+        finally:
+            await upstream.aclose()
+
+    return StreamingResponse(_gen(), media_type=media_type)
 
 
 @app.post("/threshold")
