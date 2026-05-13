@@ -92,7 +92,7 @@ export function Trajectory({ history }: TrajectoryTabProps) {
       </div>
 
       <div className="panel">
-        <h2>Recent commands</h2>
+        <div className="panel-head"><h2>Recent commands</h2></div>
         <table className="cmd-table">
           <thead><tr><th>time</th><th>cmd</th><th>result</th></tr></thead>
           <tbody>
@@ -100,7 +100,7 @@ export function Trajectory({ history }: TrajectoryTabProps) {
             {lastCmds.map((c, i) => (
               <tr key={i}>
                 <td>{new Date(c.ts * 1000).toLocaleTimeString()}</td>
-                <td><span className={`cmd-tag ${c.cmd}`}>{c.cmd}</span></td>
+                <td><span className="cmd-tag">{c.cmd}</span></td>
                 <td>{c.ok ? <span className="pill ok">ok</span> : <span className="pill bad">err</span>}</td>
               </tr>
             ))}

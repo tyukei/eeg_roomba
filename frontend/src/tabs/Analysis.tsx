@@ -5,7 +5,7 @@ import uPlot from "uplot";
 import { BrainSvg } from "../components/BrainSvg";
 import { CorrelationMatrix } from "../components/CorrelationMatrix";
 import { corrMatrix, welch } from "../fft";
-import { MONTAGE, REGION_COLORS } from "../montage";
+import { MONTAGE } from "../montage";
 import {
   AppState, BAND_COLORS, BAND_NAMES, BAND_RANGES, BandName,
   LIVE_HZ, NCH,
@@ -109,7 +109,7 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
                 <tr key={e.ch}>
                   <td><strong>ch{e.ch}</strong></td>
                   <td>{e.name}</td>
-                  <td><span className="region-chip" style={{ color: REGION_COLORS[e.region] }}>{e.region}</span></td>
+                  <td><span className="region-chip">{e.region}</span></td>
                   <td>{(topoValues[e.ch] ?? 0).toFixed(2)}</td>
                 </tr>
               ))}

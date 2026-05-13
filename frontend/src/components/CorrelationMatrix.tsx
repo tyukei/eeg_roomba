@@ -43,7 +43,7 @@ export function CorrelationMatrix({ matrix, selected }: Props) {
             <rect x={PAD_LEFT + j * CELL} y={PAD_TOP + i * CELL} width={CELL - 1} height={CELL - 1}
                   fill={colorOf(v)} />
             <text x={PAD_LEFT + j * CELL + CELL / 2} y={PAD_TOP + i * CELL + CELL / 2 + 3}
-                  textAnchor="middle" fontSize={8.5} fill={Math.abs(v) > 0.5 ? "var(--text)" : "var(--muted)"}>
+                  textAnchor="middle" fontSize={8.5} fill="var(--text)">
               {v.toFixed(2)}
             </text>
           </g>

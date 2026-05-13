@@ -41,8 +41,10 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
     scales: { x: { time: true }, y: { auto: true } },
     series: [{}, ...Array.from({ length: NCH }, (_, i) => ({
       label: `ch${i}`,
-      stroke: `hsl(212 28% ${30 + (i / (NCH - 1)) * 50}%)`,
-      width: selectedChs.includes(i) ? 1.6 : 0.9,
+      stroke: selectedChs.includes(i)
+        ? "#7aa2f7"
+        : `hsl(212 14% ${48 + (i / (NCH - 1)) * 30}%)`,
+      width: selectedChs.includes(i) ? 1.8 : 0.9,
     }))],
     axes: [
       { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" } },

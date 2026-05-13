@@ -5,7 +5,7 @@
   --surface-2: #2b303a;
   --border: #353a45;
   --text: #e8eaed;
-  --muted: #8b919c;
+  --muted: #a8acb5;
   --accent: #7aa2f7;
   --ok: #84c5a0;
   --bad: #d98a8a;
@@ -207,8 +207,6 @@ body {
   transition: border-color .12s, background .12s;
 }
 .btn:hover { border-color: var(--accent); }
-.btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-.btn.primary:hover { filter: brightness(1.05); }
 .btn.stop { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--border)); }
 .btn.stop:hover { background: color-mix(in srgb, var(--bad) 12%, transparent); }
 .btn.small { padding: 4px 10px; font-size: 11px; }
@@ -344,7 +342,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 
 small { color: var(--muted); }
 
-@media (max-width: 1280px) {
+@media (max-width: 1200px) {
   .app { grid-template-columns: 1fr; }
   .traj-wrap { grid-template-columns: 1fr; }
   .analysis-wrap { grid-template-columns: 1fr; }
