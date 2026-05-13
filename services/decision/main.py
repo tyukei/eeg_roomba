@@ -88,8 +88,8 @@ class Decider:
         asyncio.run_coroutine_threadsafe(self._dispatch(new_state), self.loop)
 
     async def _dispatch(self, state: str) -> None:
-        cmd = "0" if state == "active" else "stop"
-        url = f"{ROOMBA_BASE}/move/{cmd}"
+        cmd = "forward" if state == "active" else "stop"
+        url = f"{ROOMBA_BASE}/command/{cmd}"
         try:
             r = await self.http.post(url, timeout=2.0)
             r.raise_for_status()
