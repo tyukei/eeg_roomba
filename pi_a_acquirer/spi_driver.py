@@ -9,14 +9,14 @@ Hardware layout:
 """
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import gpiod
 import spidev
-from gpiod.line import Direction, Edge, Value
-
 from codec import _FRAME_BYTES, _decode_frame
+from gpiod.line import Direction, Edge, Value
 
 _CS_LINE = 19           # GPIO19: software MUX for chip B MISO routing
 _DRDY_LINE = 26         # GPIO26: DRDY from chip A (active-low falling edge)
@@ -37,7 +37,7 @@ def _init_chip_a(spi: spidev.SpiDev) -> None:
     spi.xfer2([0x02])  # WAKEUP
     spi.xfer2([0x0A])  # STOP
     spi.xfer2([0x06])  # RESET
-    import time; time.sleep(0.1)
+    time.sleep(0.1)
     spi.xfer2([0x11])  # SDATAC
     spi.xfer2([0x41, 0x00, 0x96])  # CONFIG1: 250 SPS
     spi.xfer2([0x42, 0x00, 0xD4])  # CONFIG2
@@ -57,7 +57,7 @@ def _init_chip_b(spi: spidev.SpiDev, cs_fn: Callable) -> None:
     send([0x02])  # WAKEUP
     send([0x0A])  # STOP
     send([0x06])  # RESET
-    import time; time.sleep(0.1)
+    time.sleep(0.1)
     send([0x11])  # SDATAC
     send([0x54, 0x00, 0x80])  # WREG GPIO(0x14)=0x80 — required for chip B
     send([0x41, 0x00, 0x96])  # CONFIG1: 250 SPS

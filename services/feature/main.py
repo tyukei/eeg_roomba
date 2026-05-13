@@ -10,7 +10,7 @@ import json
 import logging
 import os
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import asyncpg
 import numpy as np
@@ -115,7 +115,7 @@ class FeatureWorker:
         beta: np.ndarray,
         gamma: np.ndarray,
     ) -> None:
-        t = datetime.fromtimestamp(ts, tz=timezone.utc)
+        t = datetime.fromtimestamp(ts, tz=UTC)
         rows = [
             (t, ch, float(delta[ch]), float(theta[ch]), float(alpha[ch]),
              float(beta[ch]), float(gamma[ch]))

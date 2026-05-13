@@ -10,7 +10,6 @@ import time
 
 import paho.mqtt.client as mqtt
 from pylsl import StreamInfo, StreamOutlet, local_clock
-
 from spi_driver import PiEEG16
 
 SRATE = 250

@@ -6,7 +6,6 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from typing import Any
 
 import asyncpg
@@ -144,7 +143,7 @@ async def connect_roomba(body: dict[str, Any] | None = None) -> dict[str, Any]:
         r.raise_for_status()
         return r.json()
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @app.post("/control/disconnect")
@@ -154,14 +153,13 @@ async def disconnect_roomba() -> dict[str, Any]:
         r.raise_for_status()
         return r.json()
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @app.get("/control/serial_status")
 async def serial_status() -> dict[str, Any]:
     """Returns roomba-api connection status (used by UI to know if connect is needed)."""
     try:
-        r = await app.state.http.get(f"{ROOMBA_BASE}/camera/status", timeout=3.0)
         # roomba-api doesn't expose a serial-status endpoint; we detect via /command probe.
         probe = await app.state.http.post(
             f"{ROOMBA_BASE}/command/__probe__",
@@ -172,7 +170,7 @@ async def serial_status() -> dict[str, Any]:
             return {"connected": False}
         return {"connected": True}
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @app.post("/control/{cmd}")
@@ -182,7 +180,7 @@ async def proxy_control(cmd: str) -> dict[str, Any]:
         r.raise_for_status()
         return {"ok": True, "cmd": cmd}
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @app.post("/camera/start")
@@ -192,7 +190,7 @@ async def camera_start() -> dict[str, Any]:
         r.raise_for_status()
         return r.json()
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @app.post("/camera/stop")
@@ -202,7 +200,7 @@ async def camera_stop() -> dict[str, Any]:
         r.raise_for_status()
         return r.json()
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @app.get("/camera/stream")

@@ -9,11 +9,10 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import asyncpg
 import paho.mqtt.client as mqtt
-
 from sources import Chunk, EEGSource, FileReplaySource, LSLSource
 
 log = logging.getLogger("ingest")
@@ -45,7 +44,7 @@ async def _writer(pool: asyncpg.Pool, queue: asyncio.Queue[Chunk]) -> None:
         chunk = await queue.get()
         rows = []
         for sample, ts in zip(chunk.samples, chunk.timestamps):
-            t = datetime.fromtimestamp(ts, tz=timezone.utc)
+            t = datetime.fromtimestamp(ts, tz=UTC)
             for ch_idx, uv in enumerate(sample):
                 rows.append((t, ch_idx, float(uv)))
         async with pool.acquire() as conn:

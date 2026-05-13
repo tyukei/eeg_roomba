@@ -62,3 +62,28 @@ jobs:
       - name: build
         working-directory: frontend
         run: npm run build
+
+  api:
+    name: pytest · services/api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: pytest
+        working-directory: services/api
+        run: uv run --with pytest --with httpx pytest -v
+
+  ruff:
+    name: ruff lint (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install ruff
+        run: pip install ruff
+      - name: ruff check
+        run: ruff check services/ pi_a_acquirer/ pi_b_roomba_addon/
