@@ -21,21 +21,16 @@ Tailscale-flat network. SSH ControlMaster keeps connections warm — re-running 
   - `tmux send-keys -t eeg:main.2 '<cmd>' Enter` — Pi-A
   - `tmux send-keys -t eeg:main.3 '<cmd>' Enter` — Pi-B
   - Read output: `tmux capture-pane -p -t eeg:main.<n> -S -200`
-- Never `sudo rm`, `rm -rf`, `mkfs`, `dd if=` on a remote without explicit user confirmation in chat. A hook will block these patterns regardless.
-- Don't `git push --force` to `main`. Branch + PR for everything.
+- Destructive remote ops (`sudo rm`, `rm -rf`, `mkfs`, `dd if=`) and force-push to `main` are blocked by hook — don't fight it, run them manually after user confirmation.
 
-## Quick health snapshot
+## Common procedures
 
-When asked "状態は?" / "health check", run these in parallel:
+These live as on-demand skills; invoke by name or by intent:
 
-```bash
-ssh pc 'cd ~/git/eeg_roomba && docker compose ps --format json'
-ssh pi-a 'systemctl is-active pieeg; journalctl -u pieeg -n 5 --no-pager'
-ssh pi-b 'systemctl is-active roomba-state; journalctl -u roomba-state -n 5 --no-pager'
-ssh pc 'docker exec eeg_roomba-mosquitto-1 mosquitto_sub -t pieeg/health -t roomba/state -t control/state -C 3 -W 2'
-```
-
-For the full procedure see the `health-check` skill.
+- `health-check` — 3-node status snapshot ("状態は?" / "health")
+- `tail-logs`   — recent logs across the stack
+- `deploy-all`  — git pull + restart on all 3 nodes
+- `bring-up-pi` — interactive provisioning of a fresh Pi
 
 ## Layered automation (decide before adding new behavior)
 
