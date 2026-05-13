@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import UplotReact from "uplot-react";
 import uPlot from "uplot";
 
@@ -18,6 +18,8 @@ export interface LiveTabProps {
 
 export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn }: LiveTabProps) {
   void tick; // dep only
+  const [camKey, setCamKey] = useState(0);          // bumped per Start to force <img> remount
+  const [camStatus, setCamStatus] = useState<"idle" | "loading" | "live" | "error">("idle");
 
   const buf = liveBuf.current;
   const chartData = useMemo<uPlot.AlignedData>(() => {
@@ -143,28 +145,41 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
           <DPad onCmd={cmd} />
         </div>
 
-        <details className="panel">
+        <details className="panel" open>
           <summary style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", listStyle: "none" }}>
             <h2 style={{ display: "inline" }}>Camera</h2>
             <div className="cam-controls" onClick={(e) => e.preventDefault()}>
               <button className="btn small" onClick={async (e) => {
                 e.stopPropagation();
+                setCamStatus("loading");
                 await fetch(`${apiBase}/camera/start`, { method: "POST" });
+                setCamKey((k) => k + 1);
                 setCamOn(true);
               }}>Start</button>
               <button className="btn small stop" onClick={async (e) => {
                 e.stopPropagation();
                 setCamOn(false);
+                setCamStatus("idle");
                 await fetch(`${apiBase}/camera/stop`, { method: "POST" });
               }}>Stop</button>
             </div>
           </summary>
-          {camOn && (
-            <div className="cam-area">
-              <img src={`${apiBase}/camera/stream`} alt="camera" key="cam"
-                   onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-            </div>
-          )}
+          <div className="cam-area">
+            {camOn ? (
+              <>
+                <img src={`${apiBase}/camera/stream?t=${camKey}`} alt="camera" key={`cam-${camKey}`}
+                     onLoad={() => setCamStatus("live")}
+                     onError={() => setCamStatus("error")} />
+                {camStatus !== "live" && (
+                  <div className="cam-overlay">
+                    {camStatus === "error" ? "stream failed — try Stop then Start" : "connecting to camera…"}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="cam-overlay">press Start to begin preview</div>
+            )}
+          </div>
         </details>
       </div>
     </div>
