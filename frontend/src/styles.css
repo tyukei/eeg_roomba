@@ -65,6 +65,8 @@ body {
 .tab.active { color: var(--text); background: #1a2030; border-color: var(--accent); }
 .ws-badge {
   display: flex; align-items: center; gap: 6px;
+  white-space: nowrap; flex-shrink: 0;
+  padding-right: 4px;
 }
 .ws-dot {
   width: 8px; height: 8px; border-radius: 999px;

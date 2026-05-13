@@ -9,3 +9,6 @@ dist/
 # Claude Code: personal/per-machine config and audit logs
 .claude/settings.local.json
 .claude/remote-ops.log
+# uv lock files: not currently committed (Dockerfiles fall back to `uv sync`).
+# Future PR may track these for reproducible builds.
+uv.lock
