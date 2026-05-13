@@ -21,7 +21,7 @@
 - Python: **uv** only (`pyproject.toml` + `uv.lock`). Never `pip install`.
 - DB: TimescaleDB. High-rate writes use `COPY` (asyncpg `copy_records_to_table`), never `INSERT`.
 - MQTT: state topics are retained (`pieeg/health`, `control/state`, `control/threshold`, `roomba/state`); event topics are not (`eeg/chunk`, `eeg/live`, `eeg/alpha`, `roomba/cmd`).
-- LSL is PC-internal only — don't try to span hosts.
+- LSL flows pi-a outlet → PC ingest inlet (host networking + multicast). `ingest` uses `network_mode: host` for discovery. Don't add LSL between PC services or across analysis PCs — use MQTT for those.
 
 ## Skills (invoke by intent)
 
