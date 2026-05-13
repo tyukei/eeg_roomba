@@ -12,13 +12,9 @@ const CX = SIZE / 2;
 const CY = SIZE / 2;
 
 function colorOf(v: number | undefined): string {
-  if (v === undefined || v <= 0) return "#1e2533";
-  // viridis-ish ramp
+  if (v === undefined || v <= 0) return "hsl(212 12% 22%)";
   const t = Math.max(0, Math.min(1, v));
-  const r = Math.round(68 + (250 - 68) * t);
-  const g = Math.round(1 + (228 - 1) * t);
-  const b = Math.round(84 + (39 - 84) * t);
-  return `rgb(${r},${g},${b})`;
+  return `hsl(212 ${20 + t * 50}% ${28 + t * 42}%)`;
 }
 
 export function BrainSvg({ values, selected, onClick }: Props) {
@@ -28,19 +24,15 @@ export function BrainSvg({ values, selected, onClick }: Props) {
   return (
     <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width="100%" style={{ maxWidth: 320, display: "block", margin: "0 auto" }}>
       {/* Head outline */}
-      <circle cx={CX} cy={CY} r={R} fill="#0f1115" stroke="#3b4252" strokeWidth={2} />
-      {/* Nose */}
+      <circle cx={CX} cy={CY} r={R} fill="var(--surface-2)" stroke="var(--border)" strokeWidth={1.5} />
       <polygon
         points={`${CX - 12},${CY - R + 2} ${CX + 12},${CY - R + 2} ${CX},${CY - R - 14}`}
-        fill="#0f1115" stroke="#3b4252" strokeWidth={2}
+        fill="var(--surface-2)" stroke="var(--border)" strokeWidth={1.5}
       />
-      {/* Left ear */}
-      <ellipse cx={CX - R} cy={CY} rx={6} ry={14} fill="#0f1115" stroke="#3b4252" strokeWidth={2} />
-      {/* Right ear */}
-      <ellipse cx={CX + R} cy={CY} rx={6} ry={14} fill="#0f1115" stroke="#3b4252" strokeWidth={2} />
-      {/* Mid lines */}
-      <line x1={CX} y1={CY - R} x2={CX} y2={CY + R} stroke="#2a2f38" strokeWidth={1} strokeDasharray="2 4" />
-      <line x1={CX - R} y1={CY} x2={CX + R} y2={CY} stroke="#2a2f38" strokeWidth={1} strokeDasharray="2 4" />
+      <ellipse cx={CX - R} cy={CY} rx={6} ry={14} fill="var(--surface-2)" stroke="var(--border)" strokeWidth={1.5} />
+      <ellipse cx={CX + R} cy={CY} rx={6} ry={14} fill="var(--surface-2)" stroke="var(--border)" strokeWidth={1.5} />
+      <line x1={CX} y1={CY - R} x2={CX} y2={CY + R} stroke="var(--border)" strokeWidth={1} strokeDasharray="2 4" />
+      <line x1={CX - R} y1={CY} x2={CX + R} y2={CY} stroke="var(--border)" strokeWidth={1} strokeDasharray="2 4" />
 
       {/* Electrodes */}
       {MONTAGE.map((e) => {
@@ -53,15 +45,15 @@ export function BrainSvg({ values, selected, onClick }: Props) {
           <g key={e.ch} style={{ cursor: onClick ? "pointer" : "default" }} onClick={() => onClick?.(e.ch)}>
             <circle
               cx={x} cy={y}
-              r={isSel ? 16 : 13}
+              r={isSel ? 15 : 13}
               fill={fill}
-              stroke={isSel ? "#fff" : "#0f1115"}
-              strokeWidth={isSel ? 2.5 : 2}
+              stroke={isSel ? "var(--accent)" : "var(--bg)"}
+              strokeWidth={isSel ? 2 : 1.5}
             />
-            <text x={x} y={y + 4} textAnchor="middle" fontSize={10} fill="#fff" fontWeight={600}>
+            <text x={x} y={y + 3} textAnchor="middle" fontSize={9.5} fill="var(--text)" fontWeight={500}>
               {e.name}
             </text>
-            <text x={x} y={y + 24} textAnchor="middle" fontSize={9} fill="#9aa3b2">
+            <text x={x} y={y + 24} textAnchor="middle" fontSize={9} fill="var(--muted)">
               ch{e.ch}
             </text>
           </g>

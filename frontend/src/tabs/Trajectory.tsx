@@ -50,7 +50,7 @@ export function Trajectory({ history }: TrajectoryTabProps) {
   const cx = -(minX - 20);
   const cy = -(minY - 20);
 
-  const lastCmds = history.slice(-12).reverse();
+  const lastCmds = history.slice(-8).reverse();
   const last = path[path.length - 1];
 
   return (
@@ -61,31 +61,27 @@ export function Trajectory({ history }: TrajectoryTabProps) {
           <small>{history.length} events</small>
         </div>
         <div className="traj-canvas">
-          <svg viewBox={`0 0 ${w} ${h}`} width="100%" style={{ aspectRatio: w / h, background: "#0c0f14", border: "1px dashed #2a2f38", borderRadius: 8 }}>
-            {/* grid */}
+          <svg viewBox={`0 0 ${w} ${h}`} width="100%" style={{ aspectRatio: w / h, background: "var(--surface-2)", borderRadius: 6 }}>
             {Array.from({ length: Math.ceil(w / 40) + 1 }).map((_, i) => (
-              <line key={`v${i}`} x1={i * 40} y1={0} x2={i * 40} y2={h} stroke="#1d2330" strokeWidth={1} />
+              <line key={`v${i}`} x1={i * 40} y1={0} x2={i * 40} y2={h} stroke="var(--border)" strokeWidth={1} opacity={0.4} />
             ))}
             {Array.from({ length: Math.ceil(h / 40) + 1 }).map((_, i) => (
-              <line key={`h${i}`} x1={0} y1={i * 40} x2={w} y2={i * 40} stroke="#1d2330" strokeWidth={1} />
+              <line key={`h${i}`} x1={0} y1={i * 40} x2={w} y2={i * 40} stroke="var(--border)" strokeWidth={1} opacity={0.4} />
             ))}
 
-            {/* start marker */}
-            <circle cx={cx} cy={cy} r={6} fill="#34d399" stroke="#0f1115" strokeWidth={2} />
-            <text x={cx + 10} y={cy + 4} fontSize={11} fill="#9aa3b2">start</text>
+            <circle cx={cx} cy={cy} r={5} fill="var(--ok)" stroke="var(--bg)" strokeWidth={2} />
+            <text x={cx + 10} y={cy + 4} fontSize={11} fill="var(--muted)">start</text>
 
-            {/* path */}
             {path.length > 1 && (
               <polyline
                 points={path.map((p) => `${p.x + cx},${p.y + cy}`).join(" ")}
-                fill="none" stroke="#60a5fa" strokeWidth={2} strokeLinejoin="round"
+                fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round"
               />
             )}
 
-            {/* current pose */}
             {last && (
               <g transform={`translate(${last.x + cx}, ${last.y + cy}) rotate(${last.heading + 90})`}>
-                <polygon points="-8,8 8,8 0,-12" fill="#f87171" stroke="#fff" strokeWidth={1.5} />
+                <polygon points="-7,7 7,7 0,-10" fill="var(--bad)" stroke="var(--bg)" strokeWidth={1.5} />
               </g>
             )}
           </svg>
@@ -100,7 +96,7 @@ export function Trajectory({ history }: TrajectoryTabProps) {
         <table className="cmd-table">
           <thead><tr><th>time</th><th>cmd</th><th>result</th></tr></thead>
           <tbody>
-            {lastCmds.length === 0 && <tr><td colSpan={3} style={{ color: "#9aa3b2" }}>(none yet)</td></tr>}
+            {lastCmds.length === 0 && <tr><td colSpan={3} style={{ color: "var(--muted)" }}>(none yet)</td></tr>}
             {lastCmds.map((c, i) => (
               <tr key={i}>
                 <td>{new Date(c.ts * 1000).toLocaleTimeString()}</td>
