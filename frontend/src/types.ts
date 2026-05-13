@@ -15,12 +15,13 @@ export const BAND_RANGES: Record<BandName, [number, number]> = {
   gamma: [30, 45],
 };
 
+// Sequential ramp dark-blue → amber, mapping naturally to low → high frequency.
 export const BAND_COLORS: Record<BandName, string> = {
-  delta: "#a78bfa", // violet
-  theta: "#60a5fa", // blue
-  alpha: "#34d399", // green
-  beta: "#fbbf24",  // amber
-  gamma: "#f87171", // red
+  delta: "#3b5a8a",
+  theta: "#5e87b8",
+  alpha: "#86b5d9",
+  beta:  "#c9a96e",
+  gamma: "#d97757",
 };
 
 export interface Threshold {

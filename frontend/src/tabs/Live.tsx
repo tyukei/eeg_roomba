@@ -34,22 +34,26 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buf.ts.length, buf.ts[buf.ts.length - 1]]);
 
+  const selectedChs = state.threshold.channels;
+
   const chartOpts = useMemo<uPlot.Options>(() => ({
-    width: 800, height: 360,
+    width: 800, height: 300,
     scales: { x: { time: true }, y: { auto: true } },
     series: [{}, ...Array.from({ length: NCH }, (_, i) => ({
       label: `ch${i}`,
-      stroke: `hsl(${(i * 22) % 360} 70% 60%)`,
-      width: 1,
+      stroke: selectedChs.includes(i)
+        ? "#7aa2f7"
+        : `hsl(212 14% ${48 + (i / (NCH - 1)) * 30}%)`,
+      width: selectedChs.includes(i) ? 1.8 : 0.9,
     }))],
     axes: [
-      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" } },
-      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" }, size: 60 },
+      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" } },
+      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" }, size: 60 },
     ],
     legend: { show: false },
-  }), []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [selectedChs.join(",")]);
 
-  const selectedChs = state.threshold.channels;
   const cmd = async (c: string) => {
     await fetch(`${apiBase}/control/${c}`, { method: "POST" });
   };
@@ -103,16 +107,31 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
 
       <div className="side">
         <div className="panel">
-          <h2>Status</h2>
-          <div className="kv">
-            <span>PiEEG<span className="kv-hint">{!state.pieegOnline && " — no acquirer data yet"}</span></span>
-            <span className={`pill ${state.pieegOnline ? "ok" : "bad"}`}>{state.pieegOnline ? "online" : "offline"}</span>
+          <div className="panel-section">
+            <h2>Status</h2>
+            <div className="kv">
+              <span>PiEEG<span className="kv-hint">{!state.pieegOnline && " — no acquirer data yet"}</span></span>
+              <span className={`pill ${state.pieegOnline ? "ok" : "bad"}`}>{state.pieegOnline ? "online" : "offline"}</span>
+            </div>
+            <div className="kv"><span>Decision</span><span className={`pill ${state.decisionState}`}>{state.decisionState}</span></div>
+            <div className="kv"><span>Roomba</span><span className={`pill ${state.roombaOk ? "ok" : "bad"}`}>{state.roombaOk ? "ok" : "—"}</span></div>
+            <div className="row" style={{ marginTop: 10, gap: 6 }}>
+              <button className="btn small" onClick={() => fetch(`${apiBase}/control/connect`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })}>connect</button>
+              <button className="btn small stop" onClick={() => fetch(`${apiBase}/control/disconnect`, { method: "POST" })}>disconnect</button>
+            </div>
           </div>
-          <div className="kv"><span>Decision</span><span className={`pill ${state.decisionState}`}>{state.decisionState}</span></div>
-          <div className="kv"><span>Roomba</span><span className={`pill ${state.roombaOk ? "ok" : "bad"}`}>{state.roombaOk ? "ok" : "—"}</span></div>
-          <div className="row" style={{ marginTop: 8, gap: 6 }}>
-            <button className="btn small" onClick={() => fetch(`${apiBase}/control/connect`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })}>connect serial</button>
-            <button className="btn small stop" onClick={() => fetch(`${apiBase}/control/disconnect`, { method: "POST" })}>disconnect</button>
+
+          <div className="panel-section">
+            <div className="panel-head">
+              <h2>Thresholds</h2>
+              <span className={`alpha-now ${zone}`}>α {curAlpha.toFixed(2)}</span>
+            </div>
+            <Slider label="enter" min={0} max={50} step={0.5}
+              value={state.threshold.enter} onChange={(v) => setThresh({ enter: v })} hint="α ≥ enter で active" />
+            <Slider label="exit" min={0} max={50} step={0.5}
+              value={state.threshold.exit} onChange={(v) => setThresh({ exit: v })} hint="α ≤ exit で idle" />
+            <Slider label="dwell" min={0} max={3000} step={50} unit="ms"
+              value={state.threshold.dwell_ms} onChange={(v) => setThresh({ dwell_ms: v })} hint="連続超過時間" />
           </div>
         </div>
 
@@ -121,40 +140,29 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
           <DPad onCmd={cmd} />
         </div>
 
-        <div className="panel">
-          <div className="panel-head">
-            <h2>Thresholds</h2>
-            <span className={`alpha-now ${zone}`}>α = {curAlpha.toFixed(2)}</span>
-          </div>
-          <Slider label="enter" min={0} max={50} step={0.5}
-            value={state.threshold.enter} onChange={(v) => setThresh({ enter: v })} hint="α ≥ enter で active" />
-          <Slider label="exit" min={0} max={50} step={0.5}
-            value={state.threshold.exit} onChange={(v) => setThresh({ exit: v })} hint="α ≤ exit で idle" />
-          <Slider label="dwell" min={0} max={3000} step={50} unit="ms"
-            value={state.threshold.dwell_ms} onChange={(v) => setThresh({ dwell_ms: v })} hint="連続超過時間" />
-        </div>
-
-        <div className="panel">
-          <div className="panel-head">
-            <h2>Camera</h2>
-            <div className="cam-controls">
-              <button className="btn small" onClick={async () => {
+        <details className="panel">
+          <summary style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", listStyle: "none" }}>
+            <h2 style={{ display: "inline" }}>Camera</h2>
+            <div className="cam-controls" onClick={(e) => e.preventDefault()}>
+              <button className="btn small" onClick={async (e) => {
+                e.stopPropagation();
                 await fetch(`${apiBase}/camera/start`, { method: "POST" });
                 setCamOn(true);
               }}>Start</button>
-              <button className="btn small stop" onClick={async () => {
+              <button className="btn small stop" onClick={async (e) => {
+                e.stopPropagation();
                 setCamOn(false);
                 await fetch(`${apiBase}/camera/stop`, { method: "POST" });
               }}>Stop</button>
             </div>
-          </div>
+          </summary>
           {camOn && (
             <div className="cam-area">
               <img src={`${apiBase}/camera/stream`} alt="camera" key="cam"
                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
           )}
-        </div>
+        </details>
       </div>
     </div>
   );

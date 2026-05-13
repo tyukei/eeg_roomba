@@ -10,15 +10,13 @@ const PAD_LEFT = 32;
 const PAD_TOP = 32;
 const SIZE = PAD_LEFT + CELL * NCH;
 
-// Diverging palette: -1 (blue) → 0 (dark) → +1 (red).
+// Muted diverging: blue accent (+r) ↔ amber (-r), both desaturated.
 function colorOf(r: number): string {
   const t = Math.max(-1, Math.min(1, r));
   if (t >= 0) {
-    const k = Math.round(t * 220);
-    return `rgb(${30 + k},${30 + Math.round(k * 0.2)},${50})`;
+    return `hsl(212 42% ${22 + t * 38}%)`;
   } else {
-    const k = Math.round(-t * 220);
-    return `rgb(${30},${30 + Math.round(k * 0.4)},${50 + k})`;
+    return `hsl(28 38% ${22 + -t * 32}%)`;
   }
 }
 
@@ -28,13 +26,13 @@ export function CorrelationMatrix({ matrix, selected }: Props) {
       {/* axis labels */}
       {Array.from({ length: NCH }, (_, i) => (
         <text key={`yl${i}`} x={PAD_LEFT - 6} y={PAD_TOP + i * CELL + CELL / 2 + 4}
-              fontSize={10} textAnchor="end" fill={selected?.includes(i) ? "#fff" : "#9aa3b2"}>
+              fontSize={10} textAnchor="end" fill={selected?.includes(i) ? "var(--accent)" : "var(--muted)"}>
           ch{i}
         </text>
       ))}
       {Array.from({ length: NCH }, (_, j) => (
         <text key={`xl${j}`} x={PAD_LEFT + j * CELL + CELL / 2} y={PAD_TOP - 8}
-              fontSize={10} textAnchor="middle" fill={selected?.includes(j) ? "#fff" : "#9aa3b2"}>
+              fontSize={10} textAnchor="middle" fill={selected?.includes(j) ? "var(--accent)" : "var(--muted)"}>
           {j}
         </text>
       ))}
@@ -45,7 +43,7 @@ export function CorrelationMatrix({ matrix, selected }: Props) {
             <rect x={PAD_LEFT + j * CELL} y={PAD_TOP + i * CELL} width={CELL - 1} height={CELL - 1}
                   fill={colorOf(v)} />
             <text x={PAD_LEFT + j * CELL + CELL / 2} y={PAD_TOP + i * CELL + CELL / 2 + 3}
-                  textAnchor="middle" fontSize={8.5} fill={Math.abs(v) > 0.5 ? "#fff" : "#9aa3b2"}>
+                  textAnchor="middle" fontSize={8.5} fill="var(--text)">
               {v.toFixed(2)}
             </text>
           </g>

@@ -5,7 +5,7 @@ import uPlot from "uplot";
 import { BrainSvg } from "../components/BrainSvg";
 import { CorrelationMatrix } from "../components/CorrelationMatrix";
 import { corrMatrix, welch } from "../fft";
-import { MONTAGE, REGION_COLORS } from "../montage";
+import { MONTAGE } from "../montage";
 import {
   AppState, BAND_COLORS, BAND_NAMES, BAND_RANGES, BandName,
   LIVE_HZ, NCH,
@@ -37,15 +37,15 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
   }, [bb.ts.length, bb.ts[bb.ts.length - 1], ch]);
 
   const bandsOpts = useMemo<uPlot.Options>(() => ({
-    width: 900, height: 280,
+    width: 900, height: 220,
     scales: { x: { time: true }, y: { auto: true, distr: scale === "log" ? 3 : 1 } },
     series: [
       {},
       ...BAND_NAMES.map((b) => ({ label: b, stroke: BAND_COLORS[b], width: 1.5 })),
     ],
     axes: [
-      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" } },
-      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" }, size: 110 },
+      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" } },
+      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" }, size: 110 },
     ],
     legend: { show: false },
   }), [scale]);
@@ -59,15 +59,15 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
   }, [lb.ts.length, ch]);
 
   const psdOpts = useMemo<uPlot.Options>(() => ({
-    width: 500, height: 240,
+    width: 500, height: 200,
     scales: { x: { time: false }, y: { auto: true, distr: 3 } },
     series: [
       { label: "f (Hz)" },
-      { label: "PSD (μV²/Hz)", stroke: "#60a5fa", width: 1.5 },
+      { label: "PSD (μV²/Hz)", stroke: "var(--accent)", width: 1.5 },
     ],
     axes: [
-      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" }, size: 36 },
-      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" }, size: 90 },
+      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" }, size: 36 },
+      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" }, size: 90 },
     ],
     legend: { show: false },
   }), []);
@@ -86,9 +86,9 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
 
   return (
     <div className="analysis-wrap">
-      <div className="panel">
+      <div className="panel" style={{ gridColumn: 1, gridRow: "span 2" }}>
         <div className="panel-head">
-          <h2>Brain topography</h2>
+          <h2>Topography</h2>
           <label className="small-label">band:
             <select value={band} onChange={(e) => setBand(e.target.value as BandName)}>
               {BAND_NAMES.map((b) => (<option key={b} value={b}>{b}</option>))}
@@ -97,30 +97,28 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
         </div>
         <BrainSvg values={topoValues} selected={state.threshold.channels} />
         <div className="brain-meta">
-          <small>color = current {band} band power · decision chs highlighted</small>
+          <small>color = {band} band power · decision chs highlighted</small>
+        </div>
+        <div className="electrode-table-wrap" style={{ marginTop: 14 }}>
+          <table className="electrode-table">
+            <thead>
+              <tr><th>ch</th><th>label</th><th>region</th><th>{band}</th></tr>
+            </thead>
+            <tbody>
+              {MONTAGE.map((e) => (
+                <tr key={e.ch}>
+                  <td><strong>ch{e.ch}</strong></td>
+                  <td>{e.name}</td>
+                  <td><span className="region-chip">{e.region}</span></td>
+                  <td>{(topoValues[e.ch] ?? 0).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div className="panel">
-        <div className="panel-head"><h2>Channel → 10-20</h2></div>
-        <table className="electrode-table">
-          <thead>
-            <tr><th>ch</th><th>label</th><th>region</th><th>{band}</th></tr>
-          </thead>
-          <tbody>
-            {MONTAGE.map((e) => (
-              <tr key={e.ch}>
-                <td><strong>ch{e.ch}</strong></td>
-                <td>{e.name}</td>
-                <td><span className="region-chip" style={{ background: REGION_COLORS[e.region] }}>{e.region}</span></td>
-                <td>{(topoValues[e.ch] ?? 0).toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="panel full">
+      <div className="panel" style={{ gridColumn: "2 / -1", gridRow: 1 }}>
         <div className="panel-head">
           <h2>Band power · 60s</h2>
           <div className="row" style={{ gap: 8 }}>
@@ -138,35 +136,26 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
           </div>
         </div>
         <div className="chart"><UplotReact options={bandsOpts} data={bandsData} /></div>
-        <div className="band-legend">
-          {BAND_NAMES.map((b) => (
-            <span key={b} className="band-chip" style={{ borderColor: BAND_COLORS[b] }}>
-              <span className="band-swatch" style={{ background: BAND_COLORS[b] }} />
-              <strong>{b}</strong>
-              <small>{BAND_RANGES[b][0]}-{BAND_RANGES[b][1]}Hz</small>
-            </span>
-          ))}
-        </div>
       </div>
 
-      <div className="panel">
+      <div className="panel" style={{ gridColumn: 2, gridRow: 2 }}>
         <div className="panel-head">
           <h2>PSD · ch{ch}</h2>
           <small>Welch · 10s · log y</small>
         </div>
-        <div style={{ width: "100%", height: 240 }}>
+        <div style={{ width: "100%", height: 200 }}>
           <UplotReact options={psdOpts} data={psdData} />
         </div>
       </div>
 
-      <div className="panel">
-        <div className="panel-head"><h2>Band powers · ch{ch}</h2></div>
+      <div className="panel" style={{ gridColumn: 3, gridRow: 2 }}>
+        <div className="panel-head"><h2>Bands · ch{ch}</h2></div>
         <div className="band-bars">
           {bandsHere.map((b) => (
             <div className="band-bar" key={b.band}>
               <div className="band-bar-fill" style={{ height: `${(b.value / bandMax) * 100}%`, background: BAND_COLORS[b.band] }} />
               <div className="band-bar-label">
-                <strong style={{ color: BAND_COLORS[b.band] }}>{b.band}</strong>
+                <strong>{b.band}</strong>
                 <small>{BAND_RANGES[b.band][0]}-{BAND_RANGES[b.band][1]}Hz</small>
                 <span>{b.value.toFixed(2)}</span>
               </div>
@@ -178,7 +167,7 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
       <div className="panel full">
         <div className="panel-head">
           <h2>Channel correlation · 10s</h2>
-          <small>Pearson r · ±1 = synced (common-mode noise indicator)</small>
+          <small>Pearson r · ±1 = synced</small>
         </div>
         <CorrelationMatrix matrix={corr} selected={state.threshold.channels} />
       </div>

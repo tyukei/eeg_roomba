@@ -46,10 +46,11 @@ export const MONTAGE: Electrode[] = DEFAULT_LABELS.map((name, ch) => {
   return { ch, name, x, y, region: REGION[name] };
 });
 
+// Monochrome — anterior (front) darker, posterior lighter. Hue tied to brand accent.
 export const REGION_COLORS: Record<Electrode["region"], string> = {
-  frontal: "#fb923c",
-  central: "#facc15",
-  parietal: "#a3e635",
-  occipital: "#34d399",
-  temporal: "#60a5fa",
+  frontal:   "hsl(212 22% 35%)",
+  central:   "hsl(212 22% 45%)",
+  temporal:  "hsl(212 16% 40%)",
+  parietal:  "hsl(212 22% 55%)",
+  occipital: "hsl(212 22% 65%)",
 };
