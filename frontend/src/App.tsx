@@ -80,8 +80,9 @@ export default function App() {
       setS((p) => ({ ...p, decisionState: payload.state }));
     } else if (topic === "control/threshold") {
       setS((p) => ({ ...p, threshold: { ...p.threshold, ...payload } }));
+    } else if (topic === "roomba/state") {
+      setS((p) => ({ ...p, roombaOk: !!payload.online }));
     } else if (topic === "roomba/cmd") {
-      setS((p) => ({ ...p, roombaOk: !!payload.ok }));
       setTrajHistory((h) => {
         const next = [...h, { ts: payload.ts, cmd: payload.cmd, ok: !!payload.ok }];
         return next.length > 500 ? next.slice(-500) : next;
