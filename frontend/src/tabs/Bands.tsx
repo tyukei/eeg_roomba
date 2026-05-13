@@ -39,8 +39,8 @@ export function Bands({ bandsBuf, tick }: BandsTabProps) {
         width: 1.5,
       })),
     ],
-    axes: [{}, { size: 80 }],
-    legend: { show: true },
+    axes: [{}, { size: 100 }],
+    legend: { show: false },
   }), [scale]);
 
   return (

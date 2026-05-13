@@ -43,8 +43,8 @@ export function Analysis({ state, liveBuf, tick }: AnalysisTabProps) {
       { label: "f (Hz)" },
       { label: "PSD (μV²/Hz)", stroke: "#60a5fa", width: 1.5 },
     ],
-    axes: [{ size: 36 }, { size: 60 }],
-    legend: { show: true },
+    axes: [{ size: 36 }, { size: 70 }],
+    legend: { show: false },
   }), []);
 
   // Current band powers for selected channel (bar chart).
