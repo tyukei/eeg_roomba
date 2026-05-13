@@ -44,7 +44,7 @@ def _filters():
 
 def _band_power(freqs: np.ndarray, psd: np.ndarray, lo: float, hi: float) -> np.ndarray:
     mask = (freqs >= lo) & (freqs <= hi)
-    return np.trapz(psd[..., mask], freqs[mask], axis=-1)
+    return np.trapezoid(psd[..., mask], freqs[mask], axis=-1)
 
 
 def _dsn() -> str:
