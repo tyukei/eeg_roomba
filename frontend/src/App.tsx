@@ -30,7 +30,7 @@ export default function App() {
     roombaOk: false,
   });
   const [camOn, setCamOn] = useState(false);
-  const [, force] = useState(0);
+  const [tick, setTick] = useState(0);
   const [trajHistory, setTrajHistory] = useState<TrajectoryStep[]>([]);
 
   const liveBuf = useRef<{ ts: number[]; ch: number[][] }>({
@@ -91,7 +91,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    const t = setInterval(() => force((x) => x + 1), 200);
+    const t = setInterval(() => setTick((x) => x + 1), 200);
     return () => clearInterval(t);
   }, []);
 
@@ -127,10 +127,10 @@ export default function App() {
 
       <main className="content">
         {tab === "live" && (
-          <Live state={s} liveBuf={liveBuf} tick={0} apiBase={API_BASE}
+          <Live state={s} liveBuf={liveBuf} tick={tick} apiBase={API_BASE}
                 setThresh={setThresh} camOn={camOn} setCamOn={setCamOn} />
         )}
-        {tab === "bands" && <Bands bandsBuf={bandsBuf} tick={0} />}
+        {tab === "bands" && <Bands bandsBuf={bandsBuf} tick={tick} />}
         {tab === "brain" && <Brain state={s} />}
         {tab === "trajectory" && <Trajectory history={trajHistory} />}
       </main>
