@@ -24,12 +24,14 @@ Preconditions:
      ```
    - Agent: "Pi-A deploy"
      ```
-     ssh pi-a 'cd ~/Documents/eeg_roomba && git pull --ff-only && cd pi_a_acquirer && uv sync --frozen && sudo systemctl restart pieeg && systemctl is-active pieeg'
+     ssh pi-a 'export PATH="$HOME/.local/bin:$PATH" && cd ~/Documents/eeg_roomba && git pull --ff-only && cd pi_a_acquirer && uv sync --frozen && sudo systemctl restart pieeg && systemctl is-active pieeg'
      ```
    - Agent: "Pi-B deploy"
      ```
-     ssh pi-b 'cd ~/Documents/eeg_roomba && git pull --ff-only && cd pi_b_roomba_addon && uv sync --frozen && sudo systemctl restart roomba-state && systemctl is-active roomba-state'
+     ssh pi-b 'export PATH="$HOME/.local/bin:$PATH" && cd ~/Documents/eeg_roomba && git pull --ff-only && cd pi_b_roomba_addon && uv sync --frozen && sudo systemctl restart roomba-state && systemctl is-active roomba-state'
      ```
+
+   > Note: the explicit `export PATH=…` is needed because non-interactive ssh does not source `~/.bashrc` or `~/.profile`, and `uv` is installed in `~/.local/bin` on the Pis.
 
 3. After all three return, invoke the `health-check` skill and report the diff (what changed since pre-deploy).
 
