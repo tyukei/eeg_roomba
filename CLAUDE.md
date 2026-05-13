@@ -6,7 +6,7 @@
 
 | alias | role | repo path | unit |
 |---|---|---|---|
-| `pc`   | analysis / DB / UI (docker compose) | `~/git/eeg_roomba` | — |
+| `gpu-2-chukei` | analysis / DB / UI (docker compose) | `~/git/eeg_roomba` | — |
 | `pi-a` | PiEEG-16 acquisition | `~/Documents/eeg_roomba` | `pieeg.service` |
 | `pi-b` | Roomba bridge | `~/Documents/eeg_roomba` | `roomba-state.service` |
 
@@ -14,7 +14,7 @@
 
 - Idempotent remote ops only: `git pull` + `uv sync --frozen` + `systemctl restart`.
 - Same op on multiple hosts → parallel `Agent` calls in one message.
-- Long-running / interactive → tmux session `eeg`, pane `main.1`=pc, `main.2`=pi-a, `main.3`=pi-b. Read with `tmux capture-pane -p -t eeg:main.<n> -S -200`.
+- Long-running / interactive → tmux session `eeg`, pane `main.1`=gpu-2-chukei, `main.2`=pi-a, `main.3`=pi-b. Read with `tmux capture-pane -p -t eeg:main.<n> -S -200`.
 
 ## Stack rules (affect code generation)
 

@@ -7,7 +7,7 @@ INPUT="$(cat)"
 CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')"
 STATUS="$(printf '%s' "$INPUT" | jq -r '.tool_response.status // .tool_response.exit_code // "?"')"
 
-if [[ "$CMD" =~ ^ssh\ +(pc|pi-a|pi-b) ]]; then
+if [[ "$CMD" =~ ^ssh\ +(gpu-2-chukei|pi-a|pi-b) ]]; then
   LOG="${CLAUDE_PROJECT_DIR:-.}/.claude/remote-ops.log"
   mkdir -p "$(dirname "$LOG")"
   printf '%s  %s  %s\n' "$(date -u +%FT%TZ)" "$STATUS" "$CMD" >> "$LOG"

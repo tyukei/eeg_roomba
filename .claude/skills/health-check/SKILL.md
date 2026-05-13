@@ -11,10 +11,10 @@ Goal: a single status table the user can scan in one breath.
 
 Run all four checks **in parallel** (single message, multiple Bash tool calls):
 
-1. `ssh pc "cd ~/git/eeg_roomba && docker compose ps --format '{{.Service}}\t{{.Status}}'"`
+1. `ssh gpu-2-chukei "cd ~/git/eeg_roomba && docker compose ps --format '{{.Service}}\t{{.Status}}'"`
 2. `ssh pi-a 'echo PIEEG=$(systemctl is-active pieeg); journalctl -u pieeg -n 3 --no-pager'`
 3. `ssh pi-b 'echo ROOMBA_STATE=$(systemctl is-active roomba-state); echo ROOMBA_API=$(systemctl is-active roomba-api); journalctl -u roomba-state -n 3 --no-pager'`
-4. `ssh pc 'docker exec eeg_roomba-mosquitto-1 mosquitto_sub -h localhost -t pieeg/health -t roomba/state -t control/state -C 3 -W 2'`
+4. `ssh gpu-2-chukei 'docker exec eeg_roomba-mosquitto-1 mosquitto_sub -h localhost -t pieeg/health -t roomba/state -t control/state -C 3 -W 2'`
 
 ## Report format
 

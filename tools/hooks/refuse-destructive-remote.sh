@@ -12,10 +12,10 @@ fi
 
 # Patterns to block. Tweak with team consensus.
 PATTERNS=(
-  'ssh +(pc|pi-a|pi-b)([^ ]| )* (sudo +)?rm +-rf'
-  'ssh +(pc|pi-a|pi-b)([^ ]| )* mkfs'
-  'ssh +(pc|pi-a|pi-b)([^ ]| )* dd +if='
-  'ssh +(pc|pi-a|pi-b)([^ ]| )* > +/dev/sd'
+  'ssh +(gpu-2-chukei|pi-a|pi-b)([^ ]| )* (sudo +)?rm +-rf'
+  'ssh +(gpu-2-chukei|pi-a|pi-b)([^ ]| )* mkfs'
+  'ssh +(gpu-2-chukei|pi-a|pi-b)([^ ]| )* dd +if='
+  'ssh +(gpu-2-chukei|pi-a|pi-b)([^ ]| )* > +/dev/sd'
   'git +push +(--force|-f) +origin +main'
 )
 

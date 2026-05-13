@@ -7,7 +7,7 @@ description: Snapshot the last ~50 lines of logs across the 3-node stack (PC com
 
 Parallel fetch (single message, multiple Bash calls):
 
-- `ssh pc 'cd ~/git/eeg_roomba && docker compose logs --tail 50 ingest feature decision api 2>&1'`
+- `ssh gpu-2-chukei 'cd ~/git/eeg_roomba && docker compose logs --tail 50 ingest feature decision api 2>&1'`
 - `ssh pi-a 'journalctl -u pieeg -n 50 --no-pager'`
 - `ssh pi-b 'journalctl -u roomba-state -n 50 --no-pager'`
 
