@@ -20,7 +20,7 @@ Preconditions:
 
    - Agent: "PC deploy"
      ```
-     ssh pc 'cd ~/git/eeg_roomba && git pull --ff-only && docker compose up -d --build && docker compose ps'
+     ssh gpu-2-chukei 'cd ~/git/eeg_roomba && git pull --ff-only && docker compose up -d --build && docker compose ps'
      ```
    - Agent: "Pi-A deploy"
      ```
