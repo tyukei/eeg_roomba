@@ -19,6 +19,23 @@ interface State {
   roombaOk: boolean;
 }
 
+const ARROW: Record<string, string> = {
+  forward: "↑",
+  back: "↓",
+  left: "←",
+  right: "→",
+  stop: "■",
+};
+
+const KEY_TO_CMD: Record<string, string> = {
+  ArrowUp: "forward",
+  ArrowDown: "back",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  " ": "stop",
+  Escape: "stop",
+};
+
 export default function App() {
   const [s, setS] = useState<State>({
     alpha: Array(NCH).fill(0),
@@ -28,6 +45,7 @@ export default function App() {
     roombaOk: false,
   });
   const [camOn, setCamOn] = useState(false);
+  const [activeCmd, setActiveCmd] = useState<string | null>(null);
   const liveRef = useRef<{ ts: number[]; ch: number[][] }>({
     ts: [],
     ch: Array.from({ length: NCH }, () => [] as number[]),
@@ -68,14 +86,48 @@ export default function App() {
     return () => { ws.close(); clearInterval(tick); };
   }, []);
 
+  const cmd = async (c: string) => {
+    setActiveCmd(c);
+    try {
+      await fetch(`${API_BASE}/control/${c}`, { method: "POST" });
+    } finally {
+      setTimeout(() => setActiveCmd((cur) => (cur === c ? null : cur)), 200);
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const c = KEY_TO_CMD[e.key];
+      if (!c) return;
+      e.preventDefault();
+      cmd(c);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Detrend each channel for display only (huge DC offsets make the chart unreadable).
   const buf = liveRef.current;
-  const chartData: uPlot.AlignedData =
-    [buf.ts.slice(), ...buf.ch.map((c) => c.slice())] as any;
+  const chartData = useMemo<uPlot.AlignedData>(() => {
+    return [
+      buf.ts.slice(),
+      ...buf.ch.map((c) => {
+        if (c.length === 0) return [];
+        let sum = 0;
+        for (const v of c) sum += v;
+        const mean = sum / c.length;
+        return c.map((v) => v - mean);
+      }),
+    ] as any;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buf.ts.length, buf.ts[buf.ts.length - 1]]);
 
   const chartOpts = useMemo<uPlot.Options>(() => ({
     width: 800,
-    height: 480,
-    scales: { x: { time: true } },
+    height: 360,
+    scales: { x: { time: true }, y: { auto: true } },
     series: [
       {},
       ...Array.from({ length: NCH }, (_, i) => ({
@@ -84,7 +136,8 @@ export default function App() {
         width: 1,
       })),
     ],
-    axes: [{}, { size: 80 }],
+    axes: [{}, { size: 60 }],
+    legend: { show: false },
   }), []);
 
   const setThresh = async (patch: Partial<State["threshold"]>) => {
@@ -97,92 +150,168 @@ export default function App() {
     });
   };
 
-  const cmd = (c: string) => fetch(`${API_BASE}/control/${c}`, { method: "POST" });
+  const selectedChs = s.threshold.channels;
+  const currentAlpha = selectedChs.length
+    ? selectedChs.reduce((acc, c) => acc + (s.alpha[c] ?? 0), 0) / selectedChs.length
+    : 0;
+  const alphaZone =
+    currentAlpha >= s.threshold.enter ? "high"
+    : currentAlpha <= s.threshold.exit ? "low"
+    : "mid";
 
   const maxAlpha = Math.max(1, ...s.alpha);
 
   return (
     <div className="app">
-      <div className="panel">
-        <h2>EEG live (16ch)</h2>
+      <div className="panel main-panel">
+        <div className="panel-head">
+          <h2>EEG live (16ch)</h2>
+          <small>10s window · ch mean removed for display</small>
+        </div>
         <div className="chart">
           <UplotReact options={chartOpts} data={chartData} />
         </div>
-        <h2 style={{ marginTop: 16 }}>α band power (per channel)</h2>
+        <div className="panel-head" style={{ marginTop: 16 }}>
+          <h2>α band power</h2>
+          <small>decision: ch{selectedChs.join(", ch")}</small>
+        </div>
         <div className="alpha-bars">
           {s.alpha.map((v, i) => (
-            <div className="bar" key={i} title={`${v.toFixed(2)}`}>
-              <div style={{ height: `${(v / maxAlpha) * 100}%` }} />
+            <div className={`bar ${selectedChs.includes(i) ? "selected" : ""}`} key={i} title={v.toFixed(2)}>
+              <div style={{ height: `${Math.min(100, (v / maxAlpha) * 100)}%` }} />
               <span>ch{i}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="panel">
-        <h2>Status</h2>
-        <div className="row">
-          PiEEG: <span className={`tag ${s.pieegOnline ? "active" : "off"}`}>{s.pieegOnline ? "online" : "offline"}</span>
-        </div>
-        <div className="row">
-          Decision: <span className={`tag ${s.decisionState}`}>{s.decisionState}</span>
-        </div>
-        <div className="row">
-          Roomba HTTP: <span className={`tag ${s.roombaOk ? "active" : "off"}`}>{s.roombaOk ? "ok" : "—"}</span>
+      <div className="side">
+        <div className="panel">
+          <h2>Status</h2>
+          <div className="kv"><span>PiEEG</span><span className={`pill ${s.pieegOnline ? "ok" : "bad"}`}>{s.pieegOnline ? "online" : "offline"}</span></div>
+          <div className="kv"><span>Decision</span><span className={`pill ${s.decisionState}`}>{s.decisionState}</span></div>
+          <div className="kv"><span>Roomba</span><span className={`pill ${s.roombaOk ? "ok" : "bad"}`}>{s.roombaOk ? "ok" : "—"}</span></div>
         </div>
 
-        <h2 style={{ marginTop: 16 }}>Thresholds</h2>
-        <div className="row">
-          <small>enter: {s.threshold.enter.toFixed(2)}</small>
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Control</h2>
+            <small>arrows / space</small>
+          </div>
+          <div className="dpad">
+            <div className="dpad-row">
+              <span className="dpad-cell" />
+              <DPadBtn cmd="forward" active={activeCmd === "forward"} onClick={cmd} />
+              <span className="dpad-cell" />
+            </div>
+            <div className="dpad-row">
+              <DPadBtn cmd="left" active={activeCmd === "left"} onClick={cmd} />
+              <DPadBtn cmd="stop" active={activeCmd === "stop"} onClick={cmd} variant="stop" />
+              <DPadBtn cmd="right" active={activeCmd === "right"} onClick={cmd} />
+            </div>
+            <div className="dpad-row">
+              <span className="dpad-cell" />
+              <DPadBtn cmd="back" active={activeCmd === "back"} onClick={cmd} />
+              <span className="dpad-cell" />
+            </div>
+          </div>
         </div>
-        <input type="range" min={0} max={50} step={0.5}
-          value={s.threshold.enter}
-          onChange={(e) => setThresh({ enter: Number(e.target.value) })} />
-        <div className="row"><small>exit: {s.threshold.exit.toFixed(2)}</small></div>
-        <input type="range" min={0} max={50} step={0.5}
-          value={s.threshold.exit}
-          onChange={(e) => setThresh({ exit: Number(e.target.value) })} />
-        <div className="row"><small>dwell: {s.threshold.dwell_ms} ms</small></div>
-        <input type="range" min={0} max={3000} step={50}
-          value={s.threshold.dwell_ms}
-          onChange={(e) => setThresh({ dwell_ms: Number(e.target.value) })} />
 
-        <h2 style={{ marginTop: 16 }}>Manual control</h2>
-        <div className="row" style={{ flexWrap: "wrap" }}>
-          <button className="btn" onClick={() => cmd("forward")}>Forward</button>
-          <button className="btn" onClick={() => cmd("back")}>Back</button>
-          <button className="btn" onClick={() => cmd("left")}>Left</button>
-          <button className="btn" onClick={() => cmd("right")}>Right</button>
-          <button className="btn stop" onClick={() => cmd("stop")}>Stop</button>
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Thresholds</h2>
+            <span className={`alpha-now ${alphaZone}`}>α = {currentAlpha.toFixed(2)}</span>
+          </div>
+          <Slider label="enter" min={0} max={50} step={0.5} value={s.threshold.enter}
+            onChange={(v) => setThresh({ enter: v })} hint="α ≥ enter で active" />
+          <Slider label="exit" min={0} max={50} step={0.5} value={s.threshold.exit}
+            onChange={(v) => setThresh({ exit: v })} hint="α ≤ exit で idle" />
+          <Slider label="dwell" min={0} max={3000} step={50} value={s.threshold.dwell_ms}
+            unit="ms" onChange={(v) => setThresh({ dwell_ms: v })} hint="連続超過時間" />
         </div>
 
-        <h2 style={{ marginTop: 16 }}>Camera</h2>
-        <div className="row" style={{ gap: 8 }}>
-          <button
-            className="btn"
-            onClick={async () => {
-              await fetch(`${API_BASE}/camera/start`, { method: "POST" });
-              setCamOn(true);
-            }}
-          >Start</button>
-          <button
-            className="btn stop"
-            onClick={async () => {
-              setCamOn(false);
-              await fetch(`${API_BASE}/camera/stop`, { method: "POST" });
-            }}
-          >Stop</button>
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Camera</h2>
+            <div className="cam-controls">
+              <button className="btn small" onClick={async () => {
+                await fetch(`${API_BASE}/camera/start`, { method: "POST" });
+                setCamOn(true);
+              }}>Start</button>
+              <button className="btn stop small" onClick={async () => {
+                setCamOn(false);
+                await fetch(`${API_BASE}/camera/stop`, { method: "POST" });
+              }}>Stop</button>
+            </div>
+          </div>
+          <div className="cam-area">
+            {camOn ? (
+              <img
+                key="cam"
+                src={`${API_BASE}/camera/stream`}
+                alt="camera"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div className="cam-placeholder">press Start to view stream</div>
+            )}
+          </div>
         </div>
-        {camOn && (
-          <img
-            key={camOn ? "on" : "off"}
-            src={`${API_BASE}/camera/stream`}
-            alt="camera"
-            style={{ marginTop: 8, width: "100%", maxWidth: 640, borderRadius: 4 }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
-        )}
       </div>
+    </div>
+  );
+}
+
+function DPadBtn({
+  cmd, active, onClick, variant,
+}: {
+  cmd: string;
+  active: boolean;
+  onClick: (c: string) => void;
+  variant?: "stop";
+}) {
+  return (
+    <button
+      type="button"
+      className={`dpad-btn ${variant ?? "dir"} ${active ? "active" : ""}`}
+      onClick={() => onClick(cmd)}
+      aria-label={cmd}
+      title={cmd}
+    >
+      {ARROW[cmd]}
+    </button>
+  );
+}
+
+function Slider({
+  label, min, max, step, value, onChange, unit, hint,
+}: {
+  label: string;
+  min: number; max: number; step: number;
+  value: number;
+  onChange: (v: number) => void;
+  unit?: string;
+  hint?: string;
+}) {
+  return (
+    <div className="slider-row">
+      <div className="slider-head">
+        <label>{label}{hint && <small> · {hint}</small>}</label>
+        <input
+          type="number"
+          min={min} max={max} step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="slider-num"
+        />
+        {unit && <span className="slider-unit">{unit}</span>}
+      </div>
+      <input
+        type="range"
+        min={min} max={max} step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
     </div>
   );
 }
