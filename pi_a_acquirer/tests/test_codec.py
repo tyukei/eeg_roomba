@@ -80,4 +80,5 @@ def test_decode_frame_realistic_eeg_range() -> None:
     buf[4] = (raw >> 8) & 0xFF
     buf[5] = raw & 0xFF
     out = _decode_frame(bytes(buf))
-    assert abs(out[0] - target_uv) < 0.001  # well under 1 LSB
+    # Tolerance: must be within 1 LSB (≈ _UV_SCALE μV).
+    assert abs(out[0] - target_uv) <= _UV_SCALE
