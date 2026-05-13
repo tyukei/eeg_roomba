@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
-import { Live } from "./tabs/Live";
+import { Analysis } from "./tabs/Analysis";
 import { Bands } from "./tabs/Bands";
 import { Brain } from "./tabs/Brain";
+import { Live } from "./tabs/Live";
 import { Trajectory } from "./tabs/Trajectory";
 import { useWebSocket } from "./ws";
 import {
@@ -12,7 +13,7 @@ import {
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
 
-type Tab = "live" | "bands" | "brain" | "trajectory";
+type Tab = "live" | "bands" | "brain" | "analysis" | "trajectory";
 
 const emptyBands = (): Record<BandName, number[]> =>
   Object.fromEntries(BAND_NAMES.map((b) => [b, Array(NCH).fill(0)])) as any;
@@ -113,7 +114,7 @@ export default function App() {
           <strong>eeg_roomba</strong>
         </div>
         <nav className="tabs">
-          {(["live", "bands", "brain", "trajectory"] as const).map((t) => (
+          {(["live", "bands", "brain", "analysis", "trajectory"] as const).map((t) => (
             <button key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
               {t}
             </button>
@@ -132,6 +133,7 @@ export default function App() {
         )}
         {tab === "bands" && <Bands bandsBuf={bandsBuf} tick={tick} />}
         {tab === "brain" && <Brain state={s} />}
+        {tab === "analysis" && <Analysis state={s} liveBuf={liveBuf} tick={tick} />}
         {tab === "trajectory" && <Trajectory history={trajHistory} />}
       </main>
     </div>

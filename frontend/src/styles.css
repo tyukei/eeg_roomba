@@ -262,6 +262,42 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   color: #0f1115;
 }
 
+/* Analysis tab */
+.analysis-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+.analysis-wrap .panel:nth-child(3) { grid-column: 1 / -1; }
+.band-bars {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  height: 220px;
+  align-items: stretch;
+}
+.band-bar {
+  display: flex; flex-direction: column-reverse;
+  background: #1d2330; border-radius: 6px; padding: 6px;
+  position: relative;
+}
+.band-bar-fill {
+  width: 100%;
+  border-radius: 4px;
+  transition: height .2s ease-out;
+  margin-top: auto;
+}
+.band-bar-label {
+  display: flex; flex-direction: column; align-items: center;
+  margin-bottom: 4px; font-size: 11px;
+}
+.band-bar-label strong { text-transform: capitalize; }
+.band-bar-label small { color: var(--muted); font-size: 10px; }
+.band-bar-label span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; color: var(--text);
+}
+
 /* Trajectory tab */
 .traj-wrap {
   display: grid;
@@ -292,4 +328,5 @@ small { color: var(--muted); }
   .app { grid-template-columns: 1fr; }
   .brain-wrap { grid-template-columns: 1fr; }
   .traj-wrap { grid-template-columns: 1fr; }
+  .analysis-wrap { grid-template-columns: 1fr; }
 }
