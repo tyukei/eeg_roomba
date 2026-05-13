@@ -42,7 +42,10 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
       stroke: `hsl(${(i * 22) % 360} 70% 60%)`,
       width: 1,
     }))],
-    axes: [{}, { size: 60 }],
+    axes: [
+      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" } },
+      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" }, size: 60 },
+    ],
     legend: { show: false },
   }), []);
 

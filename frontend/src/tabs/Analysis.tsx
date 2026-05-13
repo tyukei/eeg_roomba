@@ -43,7 +43,10 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
       {},
       ...BAND_NAMES.map((b) => ({ label: b, stroke: BAND_COLORS[b], width: 1.5 })),
     ],
-    axes: [{}, { size: 80 }],
+    axes: [
+      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" } },
+      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" }, size: 110 },
+    ],
     legend: { show: false },
   }), [scale]);
 
@@ -62,7 +65,10 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
       { label: "f (Hz)" },
       { label: "PSD (μV²/Hz)", stroke: "#60a5fa", width: 1.5 },
     ],
-    axes: [{ size: 36 }, { size: 70 }],
+    axes: [
+      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" }, size: 36 },
+      { stroke: "#9aa3b2", grid: { stroke: "#1d2330", width: 1 }, ticks: { stroke: "#2a2f38" }, size: 90 },
+    ],
     legend: { show: false },
   }), []);
 
