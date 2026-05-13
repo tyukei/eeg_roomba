@@ -69,7 +69,20 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
           <h2>EEG live (16ch)</h2>
           <small>10s window · ch mean removed for display</small>
         </div>
-        <div className="chart"><UplotReact options={chartOpts} data={chartData} /></div>
+        <div className="chart">
+          {buf.ts.length === 0 ? (
+            <div className="chart-empty">
+              <div className="chart-empty-title">Waiting for PiEEG data…</div>
+              <small>
+                {state.pieegOnline
+                  ? "Acquirer is online · stream starting"
+                  : "WS connected — start pieeg.service on Pi-A to see the signal"}
+              </small>
+            </div>
+          ) : (
+            <UplotReact options={chartOpts} data={chartData} />
+          )}
+        </div>
 
         <div className="panel-head" style={{ marginTop: 16 }}>
           <h2>α band power</h2>
@@ -88,7 +101,10 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
       <div className="side">
         <div className="panel">
           <h2>Status</h2>
-          <div className="kv"><span>PiEEG</span><span className={`pill ${state.pieegOnline ? "ok" : "bad"}`}>{state.pieegOnline ? "online" : "offline"}</span></div>
+          <div className="kv">
+            <span>PiEEG<span className="kv-hint">{!state.pieegOnline && " — no acquirer data yet"}</span></span>
+            <span className={`pill ${state.pieegOnline ? "ok" : "bad"}`}>{state.pieegOnline ? "online" : "offline"}</span>
+          </div>
           <div className="kv"><span>Decision</span><span className={`pill ${state.decisionState}`}>{state.decisionState}</span></div>
           <div className="kv"><span>Roomba</span><span className={`pill ${state.roombaOk ? "ok" : "bad"}`}>{state.roombaOk ? "ok" : "—"}</span></div>
           <div className="row" style={{ marginTop: 8, gap: 6 }}>
@@ -129,14 +145,12 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
               }}>Stop</button>
             </div>
           </div>
-          <div className="cam-area">
-            {camOn ? (
+          {camOn && (
+            <div className="cam-area">
               <img src={`${apiBase}/camera/stream`} alt="camera" key="cam"
                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-            ) : (
-              <div className="cam-placeholder">press Start to view stream</div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
