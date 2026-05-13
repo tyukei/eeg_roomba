@@ -26,9 +26,11 @@ HOP_SEC = 0.25
 WIN_N = int(SRATE * WIN_SEC)
 HOP_N = int(SRATE * HOP_SEC)
 
-ALPHA = (8.0, 13.0)
+DELTA = (1.0, 4.0)
 THETA = (4.0, 8.0)
+ALPHA = (8.0, 13.0)
 BETA = (13.0, 30.0)
+GAMMA = (30.0, 45.0)
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
@@ -85,25 +87,45 @@ class FeatureWorker:
         freqs, psd = welch(x, fs=SRATE, nperseg=min(256, x.shape[0]), axis=0)
         # psd shape: [F, ch]
         psd_t = psd.T  # [ch, F]
-        alpha = _band_power(freqs, psd_t, *ALPHA)
+        delta = _band_power(freqs, psd_t, *DELTA)
         theta = _band_power(freqs, psd_t, *THETA)
+        alpha = _band_power(freqs, psd_t, *ALPHA)
         beta = _band_power(freqs, psd_t, *BETA)
+        gamma = _band_power(freqs, psd_t, *GAMMA)
 
         payload = {
             "ts": ts_end,
-            "alpha": alpha.tolist(),
+            "delta": delta.tolist(),
             "theta": theta.tolist(),
+            "alpha": alpha.tolist(),
             "beta": beta.tolist(),
+            "gamma": gamma.tolist(),
         }
         self.mq.publish("eeg/alpha", json.dumps(payload), qos=0, retain=True)
-        asyncio.run_coroutine_threadsafe(self._persist(ts_end, alpha, beta, theta), self.loop)
+        asyncio.run_coroutine_threadsafe(
+            self._persist(ts_end, delta, theta, alpha, beta, gamma), self.loop
+        )
 
-    async def _persist(self, ts: float, alpha: np.ndarray, beta: np.ndarray, theta: np.ndarray) -> None:
+    async def _persist(
+        self,
+        ts: float,
+        delta: np.ndarray,
+        theta: np.ndarray,
+        alpha: np.ndarray,
+        beta: np.ndarray,
+        gamma: np.ndarray,
+    ) -> None:
         t = datetime.fromtimestamp(ts, tz=timezone.utc)
-        rows = [(t, ch, float(alpha[ch]), float(beta[ch]), float(theta[ch])) for ch in range(NCH)]
+        rows = [
+            (t, ch, float(delta[ch]), float(theta[ch]), float(alpha[ch]),
+             float(beta[ch]), float(gamma[ch]))
+            for ch in range(NCH)
+        ]
         async with self.pool.acquire() as conn:
             await conn.copy_records_to_table(
-                "eeg_features", records=rows, columns=["ts", "ch", "alpha", "beta", "theta"]
+                "eeg_features",
+                records=rows,
+                columns=["ts", "ch", "delta", "theta", "alpha", "beta", "gamma"],
             )
 
 

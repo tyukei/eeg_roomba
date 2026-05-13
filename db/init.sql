@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS eeg_features (
   beta  REAL,
   theta REAL
 );
+-- 2026-05-14 migration: add delta/gamma bands (idempotent for fresh + existing DBs).
+ALTER TABLE eeg_features ADD COLUMN IF NOT EXISTS delta REAL;
+ALTER TABLE eeg_features ADD COLUMN IF NOT EXISTS gamma REAL;
 SELECT create_hypertable('eeg_features', 'ts',
   chunk_time_interval => INTERVAL '6 hours',
   if_not_exists => TRUE);
