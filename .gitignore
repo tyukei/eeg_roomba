@@ -5,3 +5,7 @@ node_modules/
 dist/
 .DS_Store
 *.log
+
+# Claude Code: personal/per-machine config and audit logs
+.claude/settings.local.json
+.claude/remote-ops.log
