@@ -136,8 +136,34 @@ async def main() -> None:
         "dwell_ms": decider.dwell_ms, "channels": decider.channels,
     }), qos=1, retain=True)
 
+    # Best-effort: open the Roomba serial port at startup so manual control
+    # works without the user needing to call /control/connect first. Retries a
+    # few times before giving up — the port stays available if connect succeeds
+    # later via the UI.
+    asyncio.create_task(_auto_connect_roomba(http))
+
     while True:
         await asyncio.sleep(3600)
+
+
+async def _auto_connect_roomba(http: httpx.AsyncClient) -> None:
+    port = os.environ.get("ROOMBA_SERIAL_PORT", "/dev/ttyACM0")
+    baud = int(os.environ.get("ROOMBA_SERIAL_BAUD", "9600"))
+    for attempt in range(5):
+        await asyncio.sleep(2 ** attempt)
+        try:
+            r = await http.post(
+                f"{ROOMBA_BASE}/connect",
+                json={"port": port, "baud_rate": baud},
+                timeout=5.0,
+            )
+            if r.status_code == 200:
+                log.info("Roomba serial connected: %s @ %d", port, baud)
+                return
+            log.warning("Roomba connect attempt %d returned %d", attempt + 1, r.status_code)
+        except Exception as e:
+            log.warning("Roomba connect attempt %d failed: %s", attempt + 1, e)
+    log.warning("Roomba auto-connect gave up; use UI /control/connect to retry")
 
 
 if __name__ == "__main__":

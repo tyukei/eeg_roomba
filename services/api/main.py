@@ -105,6 +105,76 @@ async def history_alpha(seconds: int = 60, ch: int | None = None) -> list[dict[s
     return out
 
 
+@app.get("/history/bands")
+async def history_bands(seconds: int = 60, ch: int | None = None) -> list[dict[str, Any]]:
+    q = """
+      SELECT ts, ch, delta, theta, alpha, beta, gamma FROM eeg_features
+      WHERE ts > now() - ($1::int * INTERVAL '1 second')
+      ORDER BY ts ASC
+    """
+    async with app.state.pool.acquire() as conn:
+        rows = await conn.fetch(q, seconds)
+    out = [
+        {
+            "ts": r["ts"].isoformat(),
+            "ch": r["ch"],
+            "delta": r["delta"],
+            "theta": r["theta"],
+            "alpha": r["alpha"],
+            "beta": r["beta"],
+            "gamma": r["gamma"],
+        }
+        for r in rows
+    ]
+    if ch is not None:
+        out = [r for r in out if r["ch"] == ch]
+    return out
+
+
+@app.post("/control/connect")
+async def connect_roomba(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Open the serial port on pi-b's roomba-api. Idempotent."""
+    payload = body or {"port": "/dev/ttyACM0", "baud_rate": 9600}
+    try:
+        r = await app.state.http.post(
+            f"{ROOMBA_BASE}/connect",
+            json=payload,
+            timeout=5.0,
+        )
+        r.raise_for_status()
+        return r.json()
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@app.post("/control/disconnect")
+async def disconnect_roomba() -> dict[str, Any]:
+    try:
+        r = await app.state.http.post(f"{ROOMBA_BASE}/disconnect", timeout=5.0)
+        r.raise_for_status()
+        return r.json()
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@app.get("/control/serial_status")
+async def serial_status() -> dict[str, Any]:
+    """Returns roomba-api connection status (used by UI to know if connect is needed)."""
+    try:
+        r = await app.state.http.get(f"{ROOMBA_BASE}/camera/status", timeout=3.0)
+        # roomba-api doesn't expose a serial-status endpoint; we detect via /command probe.
+        probe = await app.state.http.post(
+            f"{ROOMBA_BASE}/command/__probe__",
+            timeout=3.0,
+        )
+        if probe.status_code == 400:
+            # 400 = "Serial port not connected" pattern.
+            return {"connected": False}
+        return {"connected": True}
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
 @app.post("/control/{cmd}")
 async def proxy_control(cmd: str) -> dict[str, Any]:
     try:
