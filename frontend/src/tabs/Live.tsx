@@ -114,7 +114,10 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
               <span className={`pill ${state.pieegOnline ? "ok" : "bad"}`}>{state.pieegOnline ? "online" : "offline"}</span>
             </div>
             <div className="kv"><span>Decision</span><span className={`pill ${state.decisionState}`}>{state.decisionState}</span></div>
-            <div className="kv"><span>Roomba</span><span className={`pill ${state.roombaOk ? "ok" : "bad"}`}>{state.roombaOk ? "ok" : "—"}</span></div>
+            <div className="kv">
+              <span>Roomba<span className="kv-hint">{!state.roombaOk && " — bridge offline"}</span></span>
+              <span className={`pill ${state.roombaOk ? "ok" : "bad"}`}>{state.roombaOk ? "online" : "offline"}</span>
+            </div>
             <div className="row" style={{ marginTop: 10, gap: 6 }}>
               <button className="btn small" onClick={() => fetch(`${apiBase}/control/connect`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })}>connect</button>
               <button className="btn small stop" onClick={() => fetch(`${apiBase}/control/disconnect`, { method: "POST" })}>disconnect</button>
