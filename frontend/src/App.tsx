@@ -27,6 +27,7 @@ export default function App() {
     threshold: { enter: 10, exit: 6, dwell_ms: 500, channels: [6, 7] },
     roombaOk: false,
   });
+  const [camOn, setCamOn] = useState(false);
   const liveRef = useRef<{ ts: number[]; ch: number[][] }>({
     ts: [],
     ch: Array.from({ length: NCH }, () => [] as number[]),
@@ -67,10 +68,9 @@ export default function App() {
     return () => { ws.close(); clearInterval(tick); };
   }, []);
 
-  const chartData = useMemo<uPlot.AlignedData>(() => {
-    const buf = liveRef.current;
-    return [buf.ts, ...buf.ch] as any;
-  }, [liveRef.current.ts.length]);
+  const buf = liveRef.current;
+  const chartData: uPlot.AlignedData =
+    [buf.ts.slice(), ...buf.ch.map((c) => c.slice())] as any;
 
   const chartOpts = useMemo<uPlot.Options>(() => ({
     width: 800,
@@ -158,15 +158,30 @@ export default function App() {
 
         <h2 style={{ marginTop: 16 }}>Camera</h2>
         <div className="row" style={{ gap: 8 }}>
-          <button className="btn" onClick={() => fetch(`${API_BASE}/camera/start`, { method: "POST" })}>Start</button>
-          <button className="btn stop" onClick={() => fetch(`${API_BASE}/camera/stop`, { method: "POST" })}>Stop</button>
+          <button
+            className="btn"
+            onClick={async () => {
+              await fetch(`${API_BASE}/camera/start`, { method: "POST" });
+              setCamOn(true);
+            }}
+          >Start</button>
+          <button
+            className="btn stop"
+            onClick={async () => {
+              setCamOn(false);
+              await fetch(`${API_BASE}/camera/stop`, { method: "POST" });
+            }}
+          >Stop</button>
         </div>
-        <img
-          src={`${API_BASE}/camera/stream`}
-          alt="camera"
-          style={{ marginTop: 8, width: "100%", maxWidth: 640, borderRadius: 4 }}
-          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-        />
+        {camOn && (
+          <img
+            key={camOn ? "on" : "off"}
+            src={`${API_BASE}/camera/stream`}
+            alt="camera"
+            style={{ marginTop: 8, width: "100%", maxWidth: 640, borderRadius: 4 }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
       </div>
     </div>
   );

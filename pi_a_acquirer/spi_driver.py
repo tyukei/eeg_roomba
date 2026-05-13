@@ -16,8 +16,11 @@ import gpiod
 import spidev
 from gpiod.line import Direction, Edge, Value
 
-# Conversion: ±4.5V full scale across 24-bit signed → uV
-_UV_SCALE = 1_000_000 * 4.5 / (2**23 - 1)
+# Conversion: ±4.5V full scale across 24-bit signed → uV, divided by PGA gain.
+# Both chips are configured with PGA gain=6 (CH?SET = 0x00) below, matching
+# the upstream PiEEG-16 GUI reference (2.Graph_Gpio_D_1_5_4_OS.py).
+_PGA_GAIN = 6
+_UV_SCALE = 1_000_000 * 4.5 / (_PGA_GAIN * (2**23 - 1))
 
 _FRAME_BYTES = 27       # 3 status + 8ch * 3byte
 _CS_LINE = 19           # GPIO19: software MUX for chip B MISO routing
@@ -44,8 +47,8 @@ def _init_chip_a(spi: spidev.SpiDev) -> None:
     spi.xfer2([0x41, 0x00, 0x96])  # CONFIG1: 250 SPS
     spi.xfer2([0x42, 0x00, 0xD4])  # CONFIG2
     spi.xfer2([0x43, 0x00, 0xFF])  # CONFIG3: internal reference on
-    for reg in range(0x05, 0x0D):  # CH1SET-CH8SET: gain 24
-        spi.xfer2([0x40 | reg, 0x00, 0x60])
+    for reg in range(0x05, 0x0D):  # CH1SET-CH8SET: gain 6 (match chip B + GUI ref)
+        spi.xfer2([0x40 | reg, 0x00, 0x00])
     spi.xfer2([0x10])  # RDATAC
     spi.xfer2([0x08])  # START
 
