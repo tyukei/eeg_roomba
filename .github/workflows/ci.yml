@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  feature:
+    name: pytest · services/feature
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: pytest
+        working-directory: services/feature
+        run: uv run --with pytest pytest -v
+
+  decision:
+    name: pytest · services/decision
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: pytest
+        working-directory: services/decision
+        run: uv run --with pytest pytest -v
+
+  codec:
+    name: pytest · pi_a_acquirer/codec (no hardware deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install pytest
+        run: pip install pytest
+      - name: pytest codec only (skips spi_driver.py — needs gpiod/spidev)
+        working-directory: pi_a_acquirer
+        run: pytest tests/test_codec.py -v
+
+  frontend:
+    name: tsc + vite build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: install
+        working-directory: frontend
+        run: npm install
+      - name: typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
+      - name: build
+        working-directory: frontend
+        run: npm run build

@@ -16,13 +16,8 @@ import gpiod
 import spidev
 from gpiod.line import Direction, Edge, Value
 
-# Conversion: ±4.5V full scale across 24-bit signed → uV, divided by PGA gain.
-# Both chips are configured with PGA gain=6 (CH?SET = 0x00) below, matching
-# the upstream PiEEG-16 GUI reference (2.Graph_Gpio_D_1_5_4_OS.py).
-_PGA_GAIN = 6
-_UV_SCALE = 1_000_000 * 4.5 / (_PGA_GAIN * (2**23 - 1))
+from codec import _FRAME_BYTES, _decode_frame
 
-_FRAME_BYTES = 27       # 3 status + 8ch * 3byte
 _CS_LINE = 19           # GPIO19: software MUX for chip B MISO routing
 _DRDY_LINE = 26         # GPIO26: DRDY from chip A (active-low falling edge)
 _GPIO_CHIP = "/dev/gpiochip4"
@@ -72,18 +67,6 @@ def _init_chip_b(spi: spidev.SpiDev, cs_fn: Callable) -> None:
         send([0x40 | reg, 0x00, 0x00])
     # Chip B uses RDATA one-shot reads; do NOT send RDATAC
     send([0x08])  # START
-
-
-def _decode_frame(buf: bytes) -> list[float]:
-    """27 bytes → 8 float32 µV values."""
-    out: list[float] = []
-    for i in range(8):
-        b0, b1, b2 = buf[3 + i * 3], buf[4 + i * 3], buf[5 + i * 3]
-        raw = (b0 << 16) | (b1 << 8) | b2
-        if raw & 0x800000:
-            raw -= 0x1000000
-        out.append(raw * _UV_SCALE)
-    return out
 
 
 @dataclass
