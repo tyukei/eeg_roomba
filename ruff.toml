@@ -1,0 +1,29 @@
+# Ruff configuration shared across all Python sub-projects in this repo.
+line-length = 110
+target-version = "py312"
+
+extend-exclude = [
+  ".venv",
+  "**/__pycache__",
+  "**/tests/**",  # keep test ergonomics flexible
+]
+
+[lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "W",   # pycodestyle warnings
+  "I",   # isort
+  "B",   # bugbear (likely bugs)
+  "UP",  # pyupgrade
+]
+ignore = [
+  "E501",  # line too long (handled by formatter elsewhere if desired)
+  "B008",  # FastAPI commonly uses function-call defaults (Depends/Body)
+  "B027",  # empty method in abstract base class without @abstractmethod — used as no-op default
+  "B905",  # `zip(strict=)` not enforced; existing code already pairs equal-length inputs
+  "UP007", # `X | Y` style not enforced; `Optional[X]` allowed
+]
+
+[lint.per-file-ignores]
+"pi_a_acquirer/spi_driver.py" = ["F401"]  # codec re-exports kept for compatibility
