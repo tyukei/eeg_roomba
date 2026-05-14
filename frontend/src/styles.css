@@ -115,13 +115,15 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 240px;
   grid-template-areas:
-    "cam  traj  ctrl"
-    "trig trig  trig"
-    "auto auto  auto"
-    "cmds cmds  cmds";
+    "estop estop estop"
+    "cam   traj  ctrl"
+    "trig  trig  trig"
+    "auto  auto  auto"
+    "cmds  cmds  cmds";
   gap: 12px;
   align-items: start;
 }
+.roomba-wrap > .estop-wrap         { grid-area: estop; }
 .roomba-wrap > .cam-panel          { grid-area: cam; }
 .roomba-wrap > .traj-map-panel     { grid-area: traj; }
 .roomba-wrap > .ctrl-panel         { grid-area: ctrl; }
@@ -151,17 +153,18 @@ body {
   .roomba-wrap {
     grid-template-columns: minmax(0, 1fr) 240px;
     grid-template-areas:
-      "cam  ctrl"
-      "traj ctrl"
-      "trig trig"
-      "auto auto"
-      "cmds cmds";
+      "estop estop"
+      "cam   ctrl"
+      "traj  ctrl"
+      "trig  trig"
+      "auto  auto"
+      "cmds  cmds";
   }
 }
 @media (max-width: 900px) {
   .roomba-wrap {
     grid-template-columns: 1fr;
-    grid-template-areas: "cam" "traj" "ctrl" "trig" "auto" "cmds";
+    grid-template-areas: "estop" "cam" "traj" "ctrl" "trig" "auto" "cmds";
   }
 }
 
@@ -800,6 +803,70 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   border-color: color-mix(in srgb, var(--ok) 40%, var(--border));
 }
 .eeg-trigger-toggle input { transform: scale(1.15); cursor: pointer; }
+
+/* Emergency stop banner — pinned to the top of the Roomba tab. Designed
+ * to be unmissable: full width, large red surface, pulsing border when
+ * idle so the operator's eye lands on it. Disabled state dims to indicate
+ * the request is in flight (we don't want frantic double-clicks). */
+.estop-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* Danger surface for the panic button — explicit darker red so white text
+ * lands at WCAG AA contrast (the muted `--bad` token is tuned for pills
+ * and text on the dark surface, not as a full background for white text). */
+.estop-btn {
+  --estop-red: #b3261e;        /* ~5.0:1 contrast vs white @ 18px */
+  --estop-red-hi: #c3372f;
+  --estop-red-lo: #8a1c16;
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--estop-red);
+  border: 2px solid var(--estop-red-lo);
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--estop-red) 30%, transparent);
+  transition: background 0.12s, transform 0.06s;
+}
+.estop-btn:hover:not(:disabled) {
+  background: var(--estop-red-hi);
+}
+.estop-btn:active:not(:disabled) {
+  transform: scale(0.985);
+  background: var(--estop-red-lo);
+}
+.estop-btn:disabled {
+  /* Use an explicit busy surface instead of opacity so "stopping…" stays
+   * legible. Cursor flips to progress so the user knows the click registered. */
+  background: var(--surface-2);
+  color: var(--muted);
+  border-color: var(--border);
+  box-shadow: none;
+  cursor: progress;
+}
+.estop-flash {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.estop-flash.ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--border));
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+}
+.estop-flash.bad {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 40%, var(--border));
+  background: color-mix(in srgb, var(--bad) 10%, transparent);
+}
 
 /* Decision history — vertical timeline, newest at top (VSCode git-graph
  * style). Each row collapses the reason to one line; clicking expands it.
