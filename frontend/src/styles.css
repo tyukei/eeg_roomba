@@ -254,6 +254,48 @@ body {
 /* EEG live chart */
 .main-panel .chart { width: 100%; height: 300px; }
 
+/* Live tab — big demo-friendly decision indicator at the top */
+.decision-hero {
+  display: grid; grid-template-columns: max-content 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 18px;
+  padding: 18px 22px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: background .25s, border-color .25s, box-shadow .25s;
+}
+.decision-hero-label {
+  grid-column: 1; grid-row: 1;
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); font-weight: 500;
+}
+.decision-hero-state {
+  grid-column: 1; grid-row: 2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 48px; line-height: 1; font-weight: 600;
+  letter-spacing: .02em;
+  color: var(--muted);
+}
+.decision-hero-sub {
+  grid-column: 2; grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 13px; color: var(--muted);
+}
+.decision-hero.decision-active {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--ok) 22%, var(--surface-2)) 0%,
+    var(--surface-2) 100%);
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ok) 35%, transparent),
+              0 14px 32px -18px color-mix(in srgb, var(--ok) 60%, transparent);
+}
+.decision-hero.decision-active .decision-hero-state {
+  color: var(--ok);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--ok) 55%, transparent);
+}
+
 /* 16-channel sparkline grid (Live tab) */
 .ch-grid {
   display: grid;

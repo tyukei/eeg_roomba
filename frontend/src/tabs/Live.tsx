@@ -23,10 +23,22 @@ export function Live({ state, liveBuf, tick, setThresh }: LiveTabProps) {
   const alphaArr = state.bandsNow.alpha;
   const maxAlpha = Math.max(1, ...alphaArr);
 
+  // Demo-readable text for the big indicator.
+  const decisionLine = state.decisionState === "active"
+    ? "Roomba moving"
+    : "Roomba idle";
+
   return (
     <div className="app">
       <div className="panel main-panel">
-        <div className="panel-head">
+        {/* Big demo indicator — the whole point of the system in one glance */}
+        <div className={`decision-hero decision-${state.decisionState}`}>
+          <div className="decision-hero-label">Decision</div>
+          <div className="decision-hero-state">{state.decisionState.toUpperCase()}</div>
+          <div className="decision-hero-sub">{decisionLine}</div>
+        </div>
+
+        <div className="panel-head" style={{ marginTop: 16 }}>
           <h2>EEG live (16ch)</h2>
           <small>10s window · each ch auto-scaled · decision chs accented</small>
         </div>
@@ -58,21 +70,6 @@ export function Live({ state, liveBuf, tick, setThresh }: LiveTabProps) {
       </div>
 
       <div className="side">
-        <div className="panel">
-          <div className="panel-section">
-            <h2>Status</h2>
-            <div className="kv">
-              <span>PiEEG<span className="kv-hint">{!state.pieegOnline && " — no acquirer data yet"}</span></span>
-              <span className={`pill ${state.pieegOnline ? "ok" : "bad"}`}>{state.pieegOnline ? "online" : "offline"}</span>
-            </div>
-            <div className="kv"><span>Decision</span><span className={`pill ${state.decisionState}`}>{state.decisionState}</span></div>
-            <div className="kv">
-              <span>Roomba<span className="kv-hint">{!state.roombaOk && " — bridge offline"}</span></span>
-              <span className={`pill ${state.roombaOk ? "ok" : "bad"}`}>{state.roombaOk ? "online" : "offline"}</span>
-            </div>
-          </div>
-        </div>
-
         <div className="panel">
           <div className="panel-head">
             <h2>Thresholds</h2>
