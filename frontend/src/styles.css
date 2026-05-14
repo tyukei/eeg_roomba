@@ -504,16 +504,15 @@ body {
 /* Two-up gauges + 60s timeline showing focus vs relax indices, so the
  * user can read their current cognitive state at a glance and trace how
  * it has evolved over the last minute. */
-/* Sits flat inside .panel.main-panel — no inner border/bg in the
- * neutral state so the two cards don't visually nest. The colored
- * gradient only appears for the focused/relaxed state cue, fading
- * back to transparent at the bottom so it reads as a state tint
- * rather than a separate panel. */
+/* Sits flat inside .panel.main-panel — no inner border in any state so
+ * the two cards don't visually nest. Only the background tint changes
+ * on focused/relaxed; padding stays constant across all three states so
+ * the panel's outer dimensions don't shift when the status flips. */
 .mind-panel {
   background: transparent;
   border: 0;
   border-radius: 6px;
-  padding: 6px 0 8px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -523,13 +522,11 @@ body {
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--warn) 16%, transparent) 0%,
     transparent 90%);
-  padding: 10px 12px 10px;
 }
 .mind-panel.mind-relaxed {
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--accent) 16%, transparent) 0%,
     transparent 90%);
-  padding: 10px 12px 10px;
 }
 .mind-head {
   display: grid;
