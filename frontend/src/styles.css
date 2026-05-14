@@ -116,6 +116,7 @@ body {
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 240px;
   grid-template-areas:
     "cam  traj  ctrl"
+    "trig trig  trig"
     "auto auto  auto"
     "cmds cmds  cmds";
   gap: 12px;
@@ -124,6 +125,7 @@ body {
 .roomba-wrap > .cam-panel          { grid-area: cam; }
 .roomba-wrap > .traj-map-panel     { grid-area: traj; }
 .roomba-wrap > .ctrl-panel         { grid-area: ctrl; }
+.roomba-wrap > .eeg-trigger-panel  { grid-area: trig; }
 .roomba-wrap > .autopilot-panel    { grid-area: auto; }
 .roomba-wrap > .cmds-panel         { grid-area: cmds; }
 
@@ -151,6 +153,7 @@ body {
     grid-template-areas:
       "cam  ctrl"
       "traj ctrl"
+      "trig trig"
       "auto auto"
       "cmds cmds";
   }
@@ -158,7 +161,7 @@ body {
 @media (max-width: 900px) {
   .roomba-wrap {
     grid-template-columns: 1fr;
-    grid-template-areas: "cam" "traj" "ctrl" "auto" "cmds";
+    grid-template-areas: "cam" "traj" "ctrl" "trig" "auto" "cmds";
   }
 }
 
@@ -458,6 +461,7 @@ body {
 }
 .pill.ok, .pill.active { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--border)); }
 .pill.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--border)); }
+.pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--border)); }
 .pill.idle { color: var(--muted); }
 
 /* Drag joystick — rendered as SVG so we control the perspective and stick. */
@@ -743,6 +747,59 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   font-size: 11px;
   padding: 4px 8px;
 }
+
+/* EEG-trigger panel — single horizontal row above the autopilot strip.
+ * Layout mirrors .autopilot-horizontal so the two panels line up visually. */
+.eeg-trigger-panel .eeg-trigger-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+}
+.eeg-trigger-head {
+  display: flex; align-items: center; gap: 8px;
+}
+.eeg-trigger-head strong {
+  font-size: 12px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.eeg-trigger-form {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+.eeg-trigger-form label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--muted);
+}
+.eeg-trigger-form label > span {
+  text-transform: uppercase; letter-spacing: .04em; font-size: 10px;
+}
+.eeg-trigger-form select,
+.eeg-trigger-form input[type="text"],
+.eeg-trigger-form input[type="number"] {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font: inherit; font-size: 11px;
+}
+.eeg-trigger-form input[type="number"] { width: 56px; }
+.eeg-trigger-form input[type="text"] { width: 200px; }
+.eeg-trigger-form select:disabled,
+.eeg-trigger-form input:disabled { opacity: 0.55; cursor: not-allowed; }
+.eeg-trigger-state { font-size: 11px; color: var(--muted); }
+.eeg-trigger-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; font-size: 11px;
+  padding: 2px 8px; border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.eeg-trigger-toggle.on {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--border));
+}
+.eeg-trigger-toggle input { transform: scale(1.15); cursor: pointer; }
 
 /* Decision history — vertical timeline, newest at top (VSCode git-graph
  * style). Each row collapses the reason to one line; clicking expands it.

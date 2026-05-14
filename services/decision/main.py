@@ -41,6 +41,10 @@ class Decider:
         self.exit_th = EXIT_TH
         self.dwell_ms = DWELL_MS
         self.channels = ALPHA_CHANNELS
+        # "forward_stop": legacy direct-dispatch (active→forward, idle→stop).
+        # "off": only publish control/state, let the api's EEG-trigger
+        # autopilot own the robot. Set retained by api on /eeg-trigger toggle.
+        self.dispatch_mode = "forward_stop"
 
     def update_thresholds(self, payload: dict) -> None:
         self.enter_th = float(payload.get("enter", self.enter_th))
@@ -50,6 +54,12 @@ class Decider:
             self.channels = list(payload["channels"])
         log.info("thresholds: enter=%.2f exit=%.2f dwell=%dms ch=%s",
                  self.enter_th, self.exit_th, self.dwell_ms, self.channels)
+
+    def update_decision_mode(self, payload: dict) -> None:
+        mode = payload.get("dispatch")
+        if mode in ("forward_stop", "off") and mode != self.dispatch_mode:
+            self.dispatch_mode = mode
+            log.info("dispatch mode -> %s", mode)
 
     def on_alpha(self, payload: dict) -> None:
         alpha = payload["alpha"]
@@ -88,6 +98,12 @@ class Decider:
         asyncio.run_coroutine_threadsafe(self._dispatch(new_state), self.loop)
 
     async def _dispatch(self, state: str) -> None:
+        # When the EEG-trigger autopilot owns the robot, our direct
+        # forward/stop calls would race the Gemini-driven commands and produce
+        # thrashing. Stay quiet — control/state is still published so the api
+        # can act on the same hysteresis edges.
+        if self.dispatch_mode == "off":
+            return
         cmd = "forward" if state == "active" else "stop"
         url = f"{ROOMBA_BASE}/command/{cmd}"
         try:
@@ -95,14 +111,14 @@ class Decider:
             r.raise_for_status()
             self.mq.publish(
                 "roomba/cmd",
-                json.dumps({"cmd": cmd, "ts": time.time(), "ok": True}),
+                json.dumps({"cmd": cmd, "ts": time.time(), "ok": True, "src": "decision"}),
                 qos=1,
             )
         except Exception as e:
             log.warning("Roomba HTTP failed: %s", e)
             self.mq.publish(
                 "roomba/cmd",
-                json.dumps({"cmd": cmd, "ts": time.time(), "ok": False, "err": str(e)}),
+                json.dumps({"cmd": cmd, "ts": time.time(), "ok": False, "err": str(e), "src": "decision"}),
                 qos=1,
             )
 
@@ -123,10 +139,12 @@ async def main() -> None:
             decider.on_alpha(payload)
         elif msg.topic == "control/threshold":
             decider.update_thresholds(payload)
+        elif msg.topic == "control/decision_mode":
+            decider.update_decision_mode(payload)
 
     mq.on_message = _on_message
     mq.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
-    mq.subscribe([("eeg/alpha", 0), ("control/threshold", 1)])
+    mq.subscribe([("eeg/alpha", 0), ("control/threshold", 1), ("control/decision_mode", 1)])
     mq.loop_start()
     log.info("decision_svc running")
 
