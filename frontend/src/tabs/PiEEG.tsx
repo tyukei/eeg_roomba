@@ -214,14 +214,6 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         </div>
       </div>
 
-      <div className="panel corr-panel">
-        <div className="panel-head">
-          <h2>Channel correlation · 10s</h2>
-          <small>Pearson r · ±1 = synced</small>
-        </div>
-        <CorrelationMatrix matrix={corr} selected={state.threshold.channels} />
-      </div>
-
       <div className="panel full">
         <div className="panel-head">
           <h2>EEG live (16ch)</h2>
@@ -237,33 +229,43 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         </div>
         <BandsGrid state={state} selected={state.threshold.channels} />
       </div>
-
-      <div className="panel full cog-panel">
-        <div className="panel-head">
-          <h2>Cognitive metrics</h2>
-          <small>over decision chs {decisionChs.map((c) => `ch${c}`).join(", ")} · frontal asym uses F3/F4</small>
-        </div>
-        <div className="cog-grid">
-          <Stat label="Engagement"
-                value={engagement.toFixed(2)}
-                hint="β / (α + θ) · ↑ focus, ↓ relax" />
-          <Stat label="α / β"
-                value={alphaBeta.toFixed(2)}
-                hint="↑ relaxed, ↓ alert" />
-          <Stat label="Frontal α asym"
-                value={isNaN(frontalAsym) ? "—" : frontalAsym.toFixed(3)}
-                hint="log₁₀(F4/F3) · + approach / − withdrawal" />
-          <Stat label="α (decision chs)"
-                value={formatSI(meanAlpha)}
-                hint={`mean over ${decisionChs.length} ch`} />
-          <Stat label="β (decision chs)"
-                value={formatSI(meanBeta)}
-                hint={`mean over ${decisionChs.length} ch`} />
-          <Stat label="θ (decision chs)"
-                value={formatSI(meanTheta)}
-                hint={`mean over ${decisionChs.length} ch`} />
-        </div>
       </div>
+
+      <div className="analysis-bottom">
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Channel correlation · 10s</h2>
+            <small>Pearson r · ±1 = synced</small>
+          </div>
+          <CorrelationMatrix matrix={corr} selected={state.threshold.channels} />
+        </div>
+
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Cognitive metrics</h2>
+            <small>over decision chs {decisionChs.map((c) => `ch${c}`).join(", ")} · frontal asym uses F3/F4</small>
+          </div>
+          <div className="cog-grid">
+            <Stat label="Engagement"
+                  value={engagement.toFixed(2)}
+                  hint="β / (α + θ) · ↑ focus, ↓ relax" />
+            <Stat label="α / β"
+                  value={alphaBeta.toFixed(2)}
+                  hint="↑ relaxed, ↓ alert" />
+            <Stat label="Frontal α asym"
+                  value={isNaN(frontalAsym) ? "—" : frontalAsym.toFixed(3)}
+                  hint="log₁₀(F4/F3) · + approach / − withdrawal" />
+            <Stat label="α (decision chs)"
+                  value={formatSI(meanAlpha)}
+                  hint={`mean over ${decisionChs.length} ch`} />
+            <Stat label="β (decision chs)"
+                  value={formatSI(meanBeta)}
+                  hint={`mean over ${decisionChs.length} ch`} />
+            <Stat label="θ (decision chs)"
+                  value={formatSI(meanTheta)}
+                  hint={`mean over ${decisionChs.length} ch`} />
+          </div>
+        </div>
       </div>
     </>
   );
