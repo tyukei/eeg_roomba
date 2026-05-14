@@ -4,6 +4,8 @@ import uPlot from "uplot";
 
 import { Joystick } from "../components/Joystick";
 import { Slider } from "../components/Slider";
+import { formatSI } from "../format";
+import { themeColors } from "../theme";
 import { NCH, LIVE_BUF_SEC, LIVE_HZ, AppState, Threshold } from "../types";
 
 export interface LiveTabProps {
@@ -38,23 +40,30 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
 
   const selectedChs = state.threshold.channels;
 
-  const chartOpts = useMemo<uPlot.Options>(() => ({
-    width: 800, height: 300,
-    scales: { x: { time: true }, y: { auto: true } },
-    series: [{}, ...Array.from({ length: NCH }, (_, i) => ({
-      label: `ch${i}`,
-      stroke: selectedChs.includes(i)
-        ? "#7aa2f7"
-        : `hsl(212 14% ${48 + (i / (NCH - 1)) * 30}%)`,
-      width: selectedChs.includes(i) ? 1.8 : 0.9,
-    }))],
-    axes: [
-      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" } },
-      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" }, size: 60 },
-    ],
-    legend: { show: false },
+  const chartOpts = useMemo<uPlot.Options>(() => {
+    const c = themeColors();
+    return {
+      width: 800, height: 300,
+      scales: { x: { time: true }, y: { auto: true } },
+      series: [{}, ...Array.from({ length: NCH }, (_, i) => ({
+        label: `ch${i}`,
+        stroke: selectedChs.includes(i)
+          ? c.accent
+          : `hsl(212 14% ${48 + (i / (NCH - 1)) * 30}%)`,
+        width: selectedChs.includes(i) ? 1.8 : 0.9,
+      }))],
+      axes: [
+        { stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border } },
+        {
+          stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border },
+          size: 60,
+          values: (_u, splits) => splits.map((v) => formatSI(v)),
+        },
+      ],
+      legend: { show: false },
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [selectedChs.join(",")]);
+  }, [selectedChs.join(",")]);
 
   const cmd = async (c: string) => {
     await fetch(`${apiBase}/control/${c}`, { method: "POST" });
@@ -170,7 +179,7 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
         <div className="panel">
           <div className="panel-head">
             <h2>Thresholds</h2>
-            <span className={`alpha-now ${zone}`}>α {curAlpha.toFixed(2)}</span>
+            <span className={`alpha-now ${zone}`}>α {formatSI(curAlpha)}</span>
           </div>
           <Slider label="enter" min={0} max={50} step={0.5}
             value={state.threshold.enter} onChange={(v) => setThresh({ enter: v })} hint="α ≥ enter で active" />

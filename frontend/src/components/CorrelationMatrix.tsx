@@ -5,9 +5,9 @@ interface Props {
   selected?: number[];
 }
 
-const CELL = 28;
-const PAD_LEFT = 32;
-const PAD_TOP = 32;
+const CELL = 24;
+const PAD_LEFT = 30;
+const PAD_TOP = 26;
 const SIZE = PAD_LEFT + CELL * NCH;
 
 // Muted diverging: blue accent (+r) ↔ amber (-r), both desaturated.
@@ -22,7 +22,9 @@ function colorOf(r: number): string {
 
 export function CorrelationMatrix({ matrix, selected }: Props) {
   return (
-    <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width="100%" style={{ maxWidth: 560, display: "block" }}>
+    <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width="100%"
+         style={{ maxWidth: 460, maxHeight: 460, display: "block", margin: "0 auto" }}
+         preserveAspectRatio="xMidYMid meet">
       {/* axis labels */}
       {Array.from({ length: NCH }, (_, i) => (
         <text key={`yl${i}`} x={PAD_LEFT - 6} y={PAD_TOP + i * CELL + CELL / 2 + 4}
