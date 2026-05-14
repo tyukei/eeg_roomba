@@ -33,6 +33,20 @@ const BRAIN_RZ = 1.05;
 // Fissure half-width: particles within this distance of the central plane
 // (x=0) are excluded so a clear groove runs front-to-back across the dome.
 const FISSURE_WIDTH = 0.04;
+// Slight outward offset so electrodes float just above the wireframe shell
+// instead of intersecting it. 1.04 = "1.0 surface + 4% bump" — enough to
+// be visible without disconnecting from the cortex.
+const ELECTRODE_LIFT = 1.04;
+// montage.ts builds pos3 on a sphere of radius 1.05 (right ear = +1). Map
+// that unit-sphere position to our ellipsoid by axis-scaling.
+const MONTAGE_SPHERE_R = 1.05;
+function electrodePos(p: [number, number, number]): [number, number, number] {
+  return [
+    (p[0] / MONTAGE_SPHERE_R) * BRAIN_RX * ELECTRODE_LIFT,
+    (p[1] / MONTAGE_SPHERE_R) * BRAIN_RY * ELECTRODE_LIFT,
+    (p[2] / MONTAGE_SPHERE_R) * BRAIN_RZ * ELECTRODE_LIFT,
+  ];
+}
 
 interface BrainParticles3DProps {
   /** Per-channel value (e.g. current α power) used to size each electrode marker. */
@@ -104,11 +118,6 @@ function BrainShell({ tint }: { tint: string }) {
           side={THREE.BackSide}
           depthWrite={false}
         />
-      </mesh>
-      {/* Flat disc base so the dome doesn't look hollow underneath. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <circleGeometry args={[1.0, 28]} />
-        <meshBasicMaterial color={tint} transparent opacity={0.08} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -280,7 +289,7 @@ export default function BrainParticles3D({
             <ElectrodeMarker
               key={e.ch}
               ch={e.ch}
-              pos={e.pos3}
+              pos={electrodePos(e.pos3)}
               value={values[e.ch] ?? 0}
               vmax={vmax}
               hovered={hovered === e.ch}
