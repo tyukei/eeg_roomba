@@ -1,11 +1,13 @@
 import { lazy, Suspense } from "react";
 
+import { CameraView } from "../components/CameraView";
 import { ChannelGrid } from "../components/ChannelGrid";
 import { HeartRate } from "../components/HeartRate";
 import { MindState } from "../components/MindState";
 import { Slider } from "../components/Slider";
+import { TrajectoryMap } from "../components/TrajectoryMap";
 import { formatSI } from "../format";
-import { AppState, BandName, Threshold } from "../types";
+import { AppState, BandName, Threshold, TrajectoryStep } from "../types";
 
 // three.js lives in its own chunk via BrainParticles3D already; reuse the
 // same lazy boundary for MindTrajectory3D so the initial bundle stays slim.
@@ -17,9 +19,16 @@ export interface LiveTabProps {
   bandsBuf: React.MutableRefObject<{ ts: number[]; bands: Record<BandName, number[][]> }>;
   tick: number;            // 200ms force-render counter, just to trigger re-render
   setThresh: (patch: Partial<Threshold>) => void;
+  apiBase: string;
+  trajHistory: TrajectoryStep[];
+  camOn: boolean;
+  setCamOn: (v: boolean) => void;
 }
 
-export function Live({ state, liveBuf, bandsBuf, tick, setThresh }: LiveTabProps) {
+export function Live({
+  state, liveBuf, bandsBuf, tick, setThresh,
+  apiBase, trajHistory, camOn, setCamOn,
+}: LiveTabProps) {
   const buf = liveBuf.current;
   const selectedChs = state.threshold.channels;
 
@@ -38,61 +47,72 @@ export function Live({ state, liveBuf, bandsBuf, tick, setThresh }: LiveTabProps
     : "Roomba idle";
 
   return (
-    <div className="app">
-      <div className="panel main-panel">
-        {/* Big demo indicator — the whole point of the system in one glance */}
-        <div className={`decision-hero decision-${state.decisionState}`}>
-          <div className="decision-hero-label">Decision</div>
-          <div className="decision-hero-state">{state.decisionState.toUpperCase()}</div>
-          <div className="decision-hero-sub">{decisionLine}</div>
-        </div>
+    <div className="live-wrap">
+      {/* Top banner spans all three columns — the demo cares most about
+          this one piece of state, so it stays unmissable. */}
+      <div className={`decision-hero decision-${state.decisionState}`}>
+        <div className="decision-hero-label">Decision</div>
+        <div className="decision-hero-state">{state.decisionState.toUpperCase()}</div>
+        <div className="decision-hero-sub">{decisionLine}</div>
+      </div>
 
-        <div className="panel-head" style={{ marginTop: 16 }}>
-          <h2>Mind state</h2>
-          <small>集中 vs リラックス · 直近60秒の推移</small>
-        </div>
-        <MindState state={state} bandsBuf={bandsBuf} tick={tick} />
-
-        <div className="panel-head" style={{ marginTop: 16 }}>
-          <h2>Mind space · 3D trajectory</h2>
-          <small>focus × relax × time の軌跡 · ドラッグで回転</small>
-        </div>
-        <Suspense fallback={<div className="mind3d-loading">3D loading…</div>}>
-          <MindTrajectory3D bandsBuf={bandsBuf} tick={tick} />
-        </Suspense>
-
-        <div className="panel-head" style={{ marginTop: 16 }}>
-          <h2>EEG live (16ch)</h2>
-          <small>10s window · each ch auto-scaled · decision chs accented</small>
-        </div>
-        {buf.ts.length === 0 ? (
-          <div className="chart-empty">
-            <div className="chart-empty-title">Waiting for PiEEG data…</div>
-            <small>
-              {state.pieegOnline
-                ? "Acquirer is online · stream starting"
-                : "WS connected — start pieeg.service on Pi-A to see the signal"}
-            </small>
+      {/* Column 1 — wide-friendly content (16-ch sparkline grid + α bars). */}
+      <div className="live-col">
+        <div className="panel">
+          <div className="panel-head">
+            <h2>EEG live (16ch)</h2>
+            <small>10s · decision chs accented</small>
           </div>
-        ) : (
-          <ChannelGrid liveBuf={liveBuf} selected={selectedChs} tick={tick} />
-        )}
-
-        <div className="panel-head" style={{ marginTop: 16 }}>
-          <h2>α band power</h2>
-          <small>decision: ch{selectedChs.join(", ch")}</small>
-        </div>
-        <div className="alpha-bars">
-          {alphaArr.map((v, i) => (
-            <div className={`bar ${selectedChs.includes(i) ? "selected" : ""}`} key={i} title={v.toFixed(2)}>
-              <div style={{ height: `${Math.min(100, (v / maxAlpha) * 100)}%` }} />
-              <span>ch{i}</span>
+          {buf.ts.length === 0 ? (
+            <div className="chart-empty">
+              <div className="chart-empty-title">Waiting for PiEEG data…</div>
+              <small>
+                {state.pieegOnline
+                  ? "Acquirer is online · stream starting"
+                  : "WS connected — start pieeg.service on Pi-A"}
+              </small>
             </div>
-          ))}
+          ) : (
+            <ChannelGrid liveBuf={liveBuf} selected={selectedChs} tick={tick} />
+          )}
+        </div>
+
+        <div className="panel">
+          <div className="panel-head">
+            <h2>α band power</h2>
+            <small>decision: ch{selectedChs.join(", ch")}</small>
+          </div>
+          <div className="alpha-bars">
+            {alphaArr.map((v, i) => (
+              <div className={`bar ${selectedChs.includes(i) ? "selected" : ""}`} key={i} title={v.toFixed(2)}>
+                <div style={{ height: `${Math.min(100, (v / maxAlpha) * 100)}%` }} />
+                <span>ch{i}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="side">
+      {/* Column 2 — cognitive metrics (Mind state + 3D trajectory + HR). */}
+      <div className="live-col">
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Mind state</h2>
+            <small>集中 vs リラックス · 60s 推移</small>
+          </div>
+          <MindState state={state} bandsBuf={bandsBuf} tick={tick} />
+        </div>
+
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Mind space · 3D</h2>
+            <small>focus × relax × time</small>
+          </div>
+          <Suspense fallback={<div className="mind3d-loading">3D loading…</div>}>
+            <MindTrajectory3D bandsBuf={bandsBuf} tick={tick} />
+          </Suspense>
+        </div>
+
         <div className="panel">
           <div className="panel-head">
             <h2>Heart rate</h2>
@@ -100,6 +120,13 @@ export function Live({ state, liveBuf, bandsBuf, tick, setThresh }: LiveTabProps
           </div>
           <HeartRate liveBuf={liveBuf} tick={tick} />
         </div>
+      </div>
+
+      {/* Column 3 — Roomba context (camera + map + thresholds). */}
+      <div className="live-col">
+        <CameraView apiBase={apiBase} camOn={camOn} setCamOn={setCamOn} compact />
+
+        <TrajectoryMap history={trajHistory} compact />
 
         <div className="panel">
           <div className="panel-head">
