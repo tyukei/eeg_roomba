@@ -1029,6 +1029,71 @@ async def eeg_trigger_test_fire() -> dict[str, Any]:
     )
 
 
+@app.post("/emergency-stop")
+async def emergency_stop() -> dict[str, Any]:
+    """Big red button: halt everything that can move the Roomba.
+
+    A single endpoint so a panicking operator only has to make one network
+    call. Each step is best-effort and reported in the response — partial
+    failure should NOT abort the rest. The response always returns 200 with
+    a per-step status map so the UI can confirm what actually happened.
+
+    Steps (in order, but errors are caught and recorded individually):
+      1. Stop the autopilot loop (any goal-mode / test-fire run).
+      2. Disable the α-trigger so the next α surge doesn't auto-relaunch.
+      3. Publish `control/decision_mode={"dispatch":"off"}` retained — this
+         silences decision_svc's legacy α→forward path even if α is
+         currently above enter_th. The user must explicitly re-arm the
+         trigger or toggle dispatch through another path to re-enable.
+      4. Best-effort POST `/command/stop` to roomba-api so the wheels stop
+         even if the autopilot loop was mid-iteration.
+    """
+    out: dict[str, Any] = {}
+
+    # 1) Stop the autopilot if running. _autopilot_stop_internal handles the
+    #    not-running case gracefully.
+    try:
+        stopped = await _autopilot_stop_internal(src="emergency")
+        out["autopilot"] = stopped.get("status", "unknown")
+    except Exception as e:  # noqa: BLE001 — keep the rest of e-stop running
+        log.exception("emergency-stop: autopilot stop failed")
+        out["autopilot"] = f"error: {e}"
+
+    # 2) Disable the α-trigger so the next idle→active edge doesn't
+    #    auto-fire the autopilot we just killed.
+    app.state.eeg_trigger["enabled"] = False
+    out["trigger_enabled"] = False
+
+    # 3) Force decision_svc to stop dispatching too. dispatch=off is retained
+    #    so a fresh decision_svc would also pick this up. The user has to
+    #    re-arm the trigger to bring decision_svc back into the workflow.
+    try:
+        app.state.mq.publish(
+            "control/decision_mode",
+            json.dumps({"dispatch": "off"}),
+            qos=1,
+            retain=True,
+        )
+        out["decision_mode"] = "off"
+    except Exception as e:  # noqa: BLE001
+        log.exception("emergency-stop: decision_mode publish failed")
+        out["decision_mode"] = f"error: {e}"
+
+    # 4) Final safety: send `stop` to the Roomba directly. The autopilot
+    #    loop's own teardown also does this, but if the loop never started
+    #    OR if the user pushed e-stop because of manual joystick weirdness,
+    #    this is the one call that's guaranteed to hit the wheels.
+    try:
+        ok = await _dispatch_command("stop", src="emergency")
+        out["roomba_stop"] = "ok" if ok else "failed"
+    except Exception as e:  # noqa: BLE001
+        log.exception("emergency-stop: roomba stop dispatch failed")
+        out["roomba_stop"] = f"error: {e}"
+
+    log.warning("EMERGENCY STOP fired: %s", out)
+    return out
+
+
 SYSTEM_INSTRUCTION = (
     "You are the operator assistant for eeg_roomba — a 3-node pipeline that "
     "reads 16-channel EEG from a PiEEG, computes band power, and drives a "

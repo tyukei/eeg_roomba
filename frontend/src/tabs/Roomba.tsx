@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { AutopilotPanel } from "../components/AutopilotPanel";
 import { EegTriggerPanel } from "../components/EegTriggerPanel";
+import { EmergencyStop } from "../components/EmergencyStop";
 import { Joystick } from "../components/Joystick";
 import { AppState, TrajectoryStep } from "../types";
 
@@ -72,6 +73,8 @@ export function Roomba({ state, history, apiBase, camOn, setCamOn }: RoombaTabPr
 
   return (
     <div className="roomba-wrap compact">
+      <EmergencyStop apiBase={apiBase} />
+
       <div className="panel cam-panel">
         <div className="panel-head">
           <h2>Camera</h2>
