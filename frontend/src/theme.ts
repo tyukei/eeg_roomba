@@ -1,5 +1,6 @@
 // uPlot draws onto canvas, which cannot resolve CSS custom properties.
 // Read the values once and hand them in as concrete hex/rgba strings.
+// Cache is one-shot — if we ever ship a runtime theme switcher, drop it.
 
 let cache: Record<string, string> | null = null;
 
