@@ -29,7 +29,7 @@ export default function App() {
     threshold: { enter: 10, exit: 6, dwell_ms: 500, channels: [6, 7] },
     roombaOk: false,
   });
-  const [camOn, setCamOn] = useState(false);
+  const [camOn, setCamOn] = useState(true);
   const [tick, setTick] = useState(0);
   const [trajHistory, setTrajHistory] = useState<TrajectoryStep[]>([]);
 
@@ -94,6 +94,13 @@ export default function App() {
   useEffect(() => {
     const t = setInterval(() => setTick((x) => x + 1), 200);
     return () => clearInterval(t);
+  }, []);
+
+  // Auto-start the camera on app boot so the Live tab shows a preview
+  // as soon as it's opened, without the user having to click Start.
+  // Idempotent on the roomba-api side.
+  useEffect(() => {
+    fetch(`${API_BASE}/camera/start`, { method: "POST" }).catch(() => {});
   }, []);
 
   const setThresh = async (patch: Partial<Threshold>) => {
