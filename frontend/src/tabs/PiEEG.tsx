@@ -8,6 +8,7 @@ import { BandsGrid } from "../components/BandsGrid";
 import { BrainSvg } from "../components/BrainSvg";
 import { ChannelGrid } from "../components/ChannelGrid";
 import { CorrelationMatrix } from "../components/CorrelationMatrix";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { TimeChannelHeatmap } from "../components/TimeChannelHeatmap";
 import { corrMatrix, welch } from "../fft";
 import { formatSI } from "../format";
@@ -232,19 +233,25 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
 
       <div className="panel full brain3d-panel" data-panel="3D Brain">
         <div className="panel-head">
-          <h2>3D Brain</h2>
-          <small>drag = rotate · scroll = zoom · auto-spin · hover an electrode → all panels highlight that channel</small>
+          <h2>3D Brain · {band}</h2>
+          <small>drag to rotate · auto-spins · hover an electrode to light it up everywhere</small>
         </div>
-        <Suspense fallback={<div className="brain3d-loading">loading 3D brain…</div>}>
-          <BrainParticles3D
-            values={topoValues}
-            band={band}
-            selected={state.threshold.channels}
-            hovered={hoveredCh}
-            onHover={setHoveredCh}
-            onSelect={(c) => setCh(c)}
-          />
-        </Suspense>
+        <ErrorBoundary
+          fallback={(err) => (
+            <div className="brain3d-loading">3D brain failed to load: {err.message}</div>
+          )}
+        >
+          <Suspense fallback={<div className="brain3d-loading">loading 3D brain…</div>}>
+            <BrainParticles3D
+              values={topoValues}
+              band={band}
+              selected={state.threshold.channels}
+              hovered={hoveredCh}
+              onHover={setHoveredCh}
+              onSelect={(c) => setCh(c)}
+            />
+          </Suspense>
+        </ErrorBoundary>
       </div>
 
       <div className="panel full" data-panel="EEG live">

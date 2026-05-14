@@ -9,14 +9,15 @@ interface Props {
   onHover: (ch: number | null) => void;
 }
 
-/** Smooth blue→amber ramp (low → high power). HSL keeps it monochrome-ish
- *  so it doesn't clash with the rest of the dashboard's palette. */
+/** Smooth blue→green→amber ramp (low → high power). HSL keeps it
+ *  monochrome-ish so it doesn't clash with the rest of the dashboard's
+ *  palette. Lightness floors at 38% so empty cells don't visually
+ *  disappear into the panel background. */
 function colorFor(norm: number): string {
   const v = Math.max(0, Math.min(1, norm));
-  // Hue: 212 (dark blue) → 25 (amber). Saturation rises with intensity.
   const hue = 212 - 187 * v;
   const sat = 25 + 50 * v;
-  const light = 30 + 30 * v;
+  const light = 38 + 24 * v;
   return `hsl(${hue} ${sat}% ${light}%)`;
 }
 
@@ -31,12 +32,18 @@ export function BandHeatmap({ state, hovered, onHover }: Props) {
   // Per-band max so the colour scale is comparable across channels for the
   // same band. Avoids the "δ swamps everything" problem you'd get with a
   // single global max.
-  const perBandMax: Record<BandName, number> = {} as any;
+  const perBandMax = {} as Record<BandName, number>;
+  let globalMax = 0;
   for (const b of BAND_NAMES) {
     let m = 0;
     const arr = state.bandsNow[b];
     for (let c = 0; c < NCH; c++) if (arr[c] > m) m = arr[c];
     perBandMax[b] = Math.max(1e-9, m);
+    if (m > globalMax) globalMax = m;
+  }
+
+  if (globalMax === 0) {
+    return <div className="bh-empty">waiting for samples…</div>;
   }
 
   return (

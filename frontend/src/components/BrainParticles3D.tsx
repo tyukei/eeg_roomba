@@ -10,13 +10,13 @@
  * This module is meant to be `React.lazy`-imported from the PiEEG tab so
  * three.js isn't pulled into the initial bundle.
  */
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 
 import { MONTAGE, REGION_COLORS } from "../montage";
-import { BandName } from "../types";
+import { BAND_COLORS, BandName } from "../types";
 
 const PARTICLE_COUNT = 4000;
 // Brain-ish ellipsoid radii (x: ear-to-ear, y: top-to-chin, z: front-to-back).
@@ -63,7 +63,7 @@ function buildBrainCloud(): Float32Array {
   return arr;
 }
 
-function ParticleBrain() {
+function ParticleBrain({ tint }: { tint: string }) {
   const ref = useRef<THREE.Points>(null);
   const positions = useMemo(() => buildBrainCloud(), []);
 
@@ -84,7 +84,7 @@ function ParticleBrain() {
         />
       </bufferGeometry>
       <pointsMaterial
-        color="#86b5d9"
+        color={tint}
         size={0.018}
         sizeAttenuation
         transparent
@@ -152,7 +152,7 @@ function ElectrodeMarker({
 
 export default function BrainParticles3D({
   values,
-  band: _band,
+  band,
   selected,
   hovered,
   onHover,
@@ -160,6 +160,12 @@ export default function BrainParticles3D({
 }: BrainParticles3DProps) {
   const vmax = Math.max(1e-9, ...values);
   const selSet = useMemo(() => new Set(selected), [selected]);
+
+  // Reset the body cursor on unmount in case the component disappears while
+  // the user is still hovering an electrode (e.g., tab switch mid-hover). The
+  // ElectrodeMarker's onPointerOut wouldn't fire in that case, leaving the
+  // page cursor stuck as "pointer".
+  useEffect(() => () => { document.body.style.cursor = ""; }, []);
 
   return (
     <div className="brain3d-canvas">
@@ -170,7 +176,10 @@ export default function BrainParticles3D({
       >
         <ambientLight intensity={0.7} />
         <pointLight position={[3, 3, 3]} intensity={0.6} />
-        <ParticleBrain />
+        {/* Particle cloud tinted by the current band so this panel reads
+         *  distinctly from the 2D topography — otherwise it's just a fancy
+         *  duplicate of the same data. */}
+        <ParticleBrain tint={BAND_COLORS[band]} />
         {MONTAGE.map((e) => (
           <ElectrodeMarker
             key={e.ch}
@@ -184,16 +193,18 @@ export default function BrainParticles3D({
             onSelect={onSelect}
           />
         ))}
-        {/* Drag to rotate, scroll to zoom. enableDamping makes it feel less
-         *  jerky. We keep auto-rotation on the brain itself rather than on
-         *  the camera so dragging doesn't fight an orbit-camera autospin. */}
+        {/* Drag to rotate. enableDamping makes it feel less jerky. We keep
+         *  auto-rotation on the brain itself rather than on the camera so
+         *  dragging doesn't fight an orbit-camera autospin.
+         *
+         *  Zoom is disabled because the tab is tall and a two-finger trackpad
+         *  scroll would otherwise hijack page-scroll → zoom — once the user
+         *  enters the canvas they couldn't scroll past it. */}
         <OrbitControls
           enablePan={false}
-          enableZoom={true}
+          enableZoom={false}
           enableDamping
           dampingFactor={0.08}
-          minDistance={2.0}
-          maxDistance={5.0}
         />
       </Canvas>
       {hovered !== null && (

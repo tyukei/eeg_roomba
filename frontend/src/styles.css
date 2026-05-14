@@ -594,7 +594,12 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   background: radial-gradient(ellipse at center, var(--surface-2) 0%, var(--bg) 80%);
   border-radius: 6px;
   overflow: hidden;
+  /* Advertise the rotate affordance before the user has to discover it by
+   * clicking. OrbitControls switches the inline cursor to "grabbing" while
+   * dragging, so this is just the resting state. */
+  cursor: grab;
 }
+.brain3d-canvas:active { cursor: grabbing; }
 .brain3d-loading {
   display: grid; place-items: center;
   height: 360px; color: var(--muted);
@@ -665,10 +670,14 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   flex: 0 0 120px; height: 8px; border-radius: 2px;
   background: linear-gradient(
     to right,
-    hsl(212 25% 30%),
-    hsl(150 45% 45%),
-    hsl(25 75% 60%)
+    hsl(212 25% 38%),
+    hsl(150 45% 50%),
+    hsl(25 75% 62%)
   );
+}
+.bh-empty {
+  padding: 20px; text-align: center;
+  color: var(--muted); font-size: 12px;
 }
 
 /* ----- Time × Channel heatmap ----- */
@@ -688,16 +697,23 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   background: color-mix(in srgb, var(--accent) 22%, var(--surface-2));
   border-color: var(--accent);
 }
-.tch-grid { flex: 1 1 auto; display: flex; flex-direction: column; }
+.tch-grid {
+  flex: 1 1 auto;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
 .tch-row {
   display: flex;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  overflow: hidden;
+  /* No per-row border / radius / gap — rows must butt up against each
+   * other so the grid reads as a contiguous 2D spectrogram, not as a
+   * stack of 16 independent bar charts. */
 }
 .tch-row.hovered {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
+  z-index: 1;
 }
 .tch-cell { height: 100%; }
 .tch-empty {
