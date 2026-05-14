@@ -2,6 +2,16 @@ import { useMemo, useState } from "react";
 import uPlot from "uplot";
 
 import { AutoChart } from "../components/AutoChart";
+
+// Force a log-axis to show only powers of ten — uPlot otherwise emits a tick
+// for every minor (2,3,…,9) which makes Y labels overlap on a tall axis.
+const decadeSplits = (_u: uPlot, _idx: number, lo: number, hi: number): number[] => {
+  const out: number[] = [];
+  let v = Math.pow(10, Math.floor(Math.log10(Math.max(1, lo))));
+  let guard = 0;
+  while (v <= hi * 1.0001 && guard++ < 40) { out.push(v); v *= 10; }
+  return out.length ? out : [1];
+};
 import { BrainSvg } from "../components/BrainSvg";
 import { CorrelationMatrix } from "../components/CorrelationMatrix";
 import { corrMatrix, welch } from "../fft";
@@ -52,6 +62,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick }: PiEEGTabProps) {
         {
           stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border },
           size: 70, space: 38,
+          ...(scale === "log" ? { splits: decadeSplits } : {}),
           values: (_u, splits) => splits.map((v) => formatSI(v)),
         },
       ],
@@ -81,6 +92,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick }: PiEEGTabProps) {
         {
           stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border },
           size: 58, space: 38,
+          splits: decadeSplits,
           values: (_u, splits) => splits.map((v) => formatSI(v)),
         },
       ],
