@@ -29,8 +29,6 @@ interface BrainParticles3DProps {
   values: number[];
   /** Which band the `values` represent — drives the electrode tint. */
   band: BandName;
-  /** Which channels are currently the "decision" set (highlighted). */
-  selected: number[];
   /** The single channel under the user's pointer (cross-panel hover). */
   hovered: number | null;
   /** Notify the parent of hover/click events so they can drive other panels. */
@@ -63,35 +61,91 @@ function buildBrainCloud(): Float32Array {
   return arr;
 }
 
-function ParticleBrain({ tint }: { tint: string }) {
-  const ref = useRef<THREE.Points>(null);
+/**
+ * The brain, the facial markers AND the electrodes all rotate together
+ * inside this group so that the auto-spin (and the user's drag) keep the
+ * nose/eyes/ears glued to the "front" of the head and the electrodes
+ * fixed to their 10-20 positions. Children are passed in so the parent
+ * (which holds the React event handlers) can render the electrode meshes.
+ */
+function RotatingHead({ tint, children }: { tint: string; children: React.ReactNode }) {
+  const group = useRef<THREE.Group>(null);
   const positions = useMemo(() => buildBrainCloud(), []);
 
   useFrame((_state, dt) => {
-    if (ref.current) {
+    if (group.current) {
       // Subtle auto-rotation — fast enough to be alive, slow enough that
       // a user-driven OrbitControls drag doesn't have to fight it.
-      ref.current.rotation.y += dt * 0.12;
+      group.current.rotation.y += dt * 0.12;
     }
   });
 
   return (
-    <points ref={ref}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[positions, 3]}
+    <group ref={group}>
+      <points>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        </bufferGeometry>
+        <pointsMaterial
+          color={tint}
+          size={0.018}
+          sizeAttenuation
+          transparent
+          opacity={0.7}
+          depthWrite={false}
         />
-      </bufferGeometry>
-      <pointsMaterial
-        color={tint}
-        size={0.018}
-        sizeAttenuation
-        transparent
-        opacity={0.7}
-        depthWrite={false}
-      />
-    </points>
+      </points>
+      <FaceMarkers />
+      {children}
+    </group>
+  );
+}
+
+/**
+ * Tiny anatomy hints — a nose, two eyes, two ears — so the operator can
+ * tell at a glance which side of the brain is the *front*. Otherwise the
+ * particle cloud is rotationally symmetric and the auto-spin disorients.
+ * Coordinates match the same convention as `montage.ts:lift3D`:
+ *   +x = right ear, +y = top of head, +z = nose / forward.
+ */
+function FaceMarkers() {
+  // Skin-ish tone, slightly lighter than the dark canvas background so the
+  // markers read as anatomy rather than as more electrodes (electrodes use
+  // saturated region colours).
+  const SKIN = "#d4a791";
+  const PUPIL = "#1a1d22";
+
+  return (
+    <group>
+      {/* Nose — small cone pointing along +Z, sitting on the lower-front of
+       *  the dome. ConeGeometry's apex defaults to +Y, so rotate -π/2 on X
+       *  to make it point at the camera in the default view. */}
+      <mesh position={[0, 0.1, 1.02]} rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.07, 0.18, 12]} />
+        <meshBasicMaterial color={SKIN} />
+      </mesh>
+
+      {/* Eyes — two small dark spheres on the front-lower face. */}
+      <mesh position={[-0.25, -0.05, 0.95]}>
+        <sphereGeometry args={[0.06, 12, 12]} />
+        <meshBasicMaterial color={PUPIL} />
+      </mesh>
+      <mesh position={[0.25, -0.05, 0.95]}>
+        <sphereGeometry args={[0.06, 12, 12]} />
+        <meshBasicMaterial color={PUPIL} />
+      </mesh>
+
+      {/* Ears — torus rings on the side of the head, oriented so the hole
+       *  faces outward (visible from the side). */}
+      <mesh position={[-1.02, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <torusGeometry args={[0.12, 0.04, 10, 24]} />
+        <meshBasicMaterial color={SKIN} />
+      </mesh>
+      <mesh position={[1.02, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <torusGeometry args={[0.12, 0.04, 10, 24]} />
+        <meshBasicMaterial color={SKIN} />
+      </mesh>
+    </group>
   );
 }
 
@@ -100,7 +154,6 @@ function ElectrodeMarker({
   pos,
   value,
   vmax,
-  selected,
   hovered,
   onHover,
   onSelect,
@@ -109,23 +162,22 @@ function ElectrodeMarker({
   pos: [number, number, number];
   value: number;
   vmax: number;
-  selected: boolean;
   hovered: boolean;
   onHover: (ch: number | null) => void;
   onSelect?: (ch: number) => void;
 }) {
   // Marker size scales with the channel's band power so the user can see at
-  // a glance which electrodes are "hot" right now, similar to the topomap
-  // but in 3D.
+  // a glance which electrodes are "hot" right now. We intentionally don't
+  // bias the marker for the "decision" set: the 3D brain is an at-a-glance
+  // view and the user found the default-highlighted dots distracting. The
+  // decision channels are still visible in the table/topography below.
   const norm = vmax > 0 ? Math.min(1, value / vmax) : 0;
-  const base = 0.045;
-  const size = base + norm * 0.04 + (hovered ? 0.025 : 0) + (selected ? 0.01 : 0);
+  const base = 0.042;
+  const size = base + norm * 0.04 + (hovered ? 0.025 : 0);
 
   const color = hovered
     ? "#d97757"            // brand accent (hover = focus)
-    : selected
-      ? "#86b5d9"
-      : REGION_COLORS[MONTAGE[ch].region];
+    : REGION_COLORS[MONTAGE[ch].region];
 
   return (
     <mesh
@@ -153,13 +205,11 @@ function ElectrodeMarker({
 export default function BrainParticles3D({
   values,
   band,
-  selected,
   hovered,
   onHover,
   onSelect,
 }: BrainParticles3DProps) {
   const vmax = Math.max(1e-9, ...values);
-  const selSet = useMemo(() => new Set(selected), [selected]);
 
   // Reset the body cursor on unmount in case the component disappears while
   // the user is still hovering an electrode (e.g., tab switch mid-hover). The
@@ -179,20 +229,20 @@ export default function BrainParticles3D({
         {/* Particle cloud tinted by the current band so this panel reads
          *  distinctly from the 2D topography — otherwise it's just a fancy
          *  duplicate of the same data. */}
-        <ParticleBrain tint={BAND_COLORS[band]} />
-        {MONTAGE.map((e) => (
-          <ElectrodeMarker
-            key={e.ch}
-            ch={e.ch}
-            pos={e.pos3}
-            value={values[e.ch] ?? 0}
-            vmax={vmax}
-            selected={selSet.has(e.ch)}
-            hovered={hovered === e.ch}
-            onHover={onHover}
-            onSelect={onSelect}
-          />
-        ))}
+        <RotatingHead tint={BAND_COLORS[band]}>
+          {MONTAGE.map((e) => (
+            <ElectrodeMarker
+              key={e.ch}
+              ch={e.ch}
+              pos={e.pos3}
+              value={values[e.ch] ?? 0}
+              vmax={vmax}
+              hovered={hovered === e.ch}
+              onHover={onHover}
+              onSelect={onSelect}
+            />
+          ))}
+        </RotatingHead>
         {/* Drag to rotate. enableDamping makes it feel less jerky. We keep
          *  auto-rotation on the brain itself rather than on the camera so
          *  dragging doesn't fight an orbit-camera autospin.
