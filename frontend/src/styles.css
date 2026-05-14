@@ -80,6 +80,19 @@ body {
 .ws-dot.connecting { background: var(--warn); }
 .ws-dot.closed { background: var(--bad); }
 
+.header-status {
+  display: flex; align-items: center; gap: 14px;
+  margin-left: 24px;
+}
+.header-pill {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--muted);
+  letter-spacing: .03em;
+}
+.header-pill-label {
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 500;
+}
+
 .content { padding: 20px 24px; }
 
 /* Live tab — 2-col main + side */
