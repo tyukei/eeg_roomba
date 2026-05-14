@@ -7,6 +7,7 @@ import binascii
 import json
 import logging
 import os
+import re
 import time
 from contextlib import asynccontextmanager
 from typing import Any
@@ -27,6 +28,9 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 ROOMBA_BASE = os.environ.get("ROOMBA_HTTP_BASE", "http://localhost:8000").rstrip("/")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
+GEMINI_ROBOTICS_MODEL = os.environ.get(
+    "GEMINI_ROBOTICS_MODEL", "gemini-robotics-er-1.6-preview"
+)
 
 # Topic -> set of websockets to fan out to.
 SUBS: dict[str, set[WebSocket]] = {
@@ -53,6 +57,23 @@ async def lifespan(app: FastAPI):
     app.state.pool = await asyncpg.create_pool(_dsn(), min_size=1, max_size=4)
     app.state.http = httpx.AsyncClient()
     app.state.genai = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+    app.state.autopilot = {
+        "task": None,
+        "running": False,
+        "config": {
+            "interval": 3.0,
+            "model": GEMINI_ROBOTICS_MODEL,
+            "mode": "free",
+            "goal": "",
+        },
+        "last_command": None,
+        "last_reason": None,
+        "last_error": None,
+        "decisions": [],  # list[{ts, command, reason, ok}]
+        # Guards concurrent /autopilot/start and /stop so two racers can't both
+        # claim the loop or both leave a dangling task.
+        "lock": asyncio.Lock(),
+    }
 
     loop = asyncio.get_running_loop()
     mq = mqtt.Client(client_id="api", protocol=mqtt.MQTTv311)
@@ -73,6 +94,23 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        ap = app.state.autopilot
+        task = ap.get("task")
+        if task and not task.done():
+            # Ask the loop to exit cleanly first; its finally block sends one
+            # last "stop" while http is still open. If it doesn't exit in 5s
+            # (stuck in a Gemini call etc.), cancel and move on.
+            ap["running"] = False
+            try:
+                await asyncio.wait_for(task, timeout=5.0)
+            except asyncio.TimeoutError:
+                task.cancel()
+                try:
+                    await asyncio.wait_for(task, timeout=2.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
+            except asyncio.CancelledError:
+                pass
         mq.loop_stop()
         await app.state.http.aclose()
         await app.state.pool.close()
@@ -181,8 +219,11 @@ async def serial_status() -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
-async def _dispatch_command(cmd: str) -> None:
-    """Background-task half of /control/{cmd}: hits roomba-api and reports."""
+async def _dispatch_command(cmd: str, src: str = "manual") -> bool:
+    """Background-task half of /control/{cmd}: hits roomba-api and reports.
+
+    Returns True on success so callers (autopilot) can record the outcome.
+    """
     try:
         r = await app.state.http.post(f"{ROOMBA_BASE}/command/{cmd}", timeout=2.0)
         r.raise_for_status()
@@ -190,15 +231,16 @@ async def _dispatch_command(cmd: str) -> None:
         log.warning("roomba command %s failed: %s", cmd, e)
         app.state.mq.publish(
             "roomba/cmd",
-            json.dumps({"cmd": cmd, "ts": time.time(), "ok": False, "err": str(e), "src": "manual"}),
+            json.dumps({"cmd": cmd, "ts": time.time(), "ok": False, "err": str(e), "src": src}),
             qos=1,
         )
-        return
+        return False
     app.state.mq.publish(
         "roomba/cmd",
-        json.dumps({"cmd": cmd, "ts": time.time(), "ok": True, "src": "manual"}),
+        json.dumps({"cmd": cmd, "ts": time.time(), "ok": True, "src": src}),
         qos=1,
     )
+    return True
 
 
 @app.post("/control/{cmd}")
@@ -261,6 +303,316 @@ async def camera_stream():
 async def set_threshold(body: dict[str, Any]) -> dict[str, str]:
     app.state.mq.publish("control/threshold", json.dumps(body), qos=1, retain=True)
     return {"status": "queued"}
+
+
+AUTOPILOT_VALID_CMDS = {"forward", "left", "right", "back", "stop"}
+AUTOPILOT_MAX_DECISIONS = 20
+AUTOPILOT_FRAME_TIMEOUT = 4.0
+AUTOPILOT_FRAME_MAX_BYTES = 2 * 1024 * 1024  # 2 MB per JPEG, very generous
+
+AUTOPILOT_PROMPT_FREE = (
+    "You are the navigation brain of a Roomba robot. You see through its front camera.\n"
+    "\n"
+    "Step 1 - Analyze the scene: Identify obstacles, walls, open paths, and spatial layout.\n"
+    "Step 2 - Decide action: Pick ONE command from the list below.\n"
+    "\n"
+    "Commands:\n"
+    "- forward: Path ahead is clear\n"
+    "- left: Turn left to avoid obstacle or explore\n"
+    "- right: Turn right to avoid obstacle or explore\n"
+    "- back: Too close to obstacle, reverse\n"
+    "- stop: Unsafe or unclear situation\n"
+    "\n"
+    'Respond with ONLY this JSON (no markdown, no extra text):\n'
+    '{"command": "<command>", "reason": "<brief scene analysis and why this action>"}'
+)
+
+AUTOPILOT_PROMPT_GOAL = (
+    "You are the navigation brain of a Roomba robot. You see through its front camera.\n"
+    "Your goal: {goal}\n"
+    "\n"
+    "Step 1 - Analyze the scene: What do you see? Is the goal (or path toward it) visible?\n"
+    "Step 2 - Decide action: Move toward the goal while avoiding obstacles.\n"
+    "Step 3 - If you have reached the goal, stop.\n"
+    "\n"
+    "Commands:\n"
+    "- forward: Move toward the goal\n"
+    "- left: Turn left to find or approach the goal\n"
+    "- right: Turn right to find or approach the goal\n"
+    "- back: Too close to obstacle, reverse\n"
+    "- stop: Goal reached OR unsafe situation\n"
+    "\n"
+    'Respond with ONLY this JSON (no markdown, no extra text):\n'
+    '{{"command": "<command>", "reason": "<what you see and progress toward goal>"}}'
+)
+
+
+async def _grab_jpeg_frame() -> bytes | None:
+    """Pull one JPEG frame out of pi-b's MJPEG stream.
+
+    The roomba-api on pi-b serves `multipart/x-mixed-replace; boundary=frame`,
+    so we read chunks until we have one complete `Content-Length` part, then
+    close the stream. Returns None on any failure — callers should treat it
+    as a transient and try again on the next tick.
+    """
+    try:
+        req = app.state.http.build_request(
+            "GET", f"{ROOMBA_BASE}/camera/stream", timeout=AUTOPILOT_FRAME_TIMEOUT
+        )
+        upstream = await app.state.http.send(req, stream=True)
+    except httpx.HTTPError as e:
+        log.warning("autopilot frame fetch failed: %s", e)
+        return None
+    if upstream.status_code != 200:
+        await upstream.aclose()
+        return None
+
+    buf = bytearray()
+
+    async def _read_one() -> bytes | None:
+        async for chunk in upstream.aiter_raw():
+            buf.extend(chunk)
+            if len(buf) > AUTOPILOT_FRAME_MAX_BYTES * 2:
+                return None
+            # Need at least one full header section before we can parse a length.
+            header_end = buf.find(b"\r\n\r\n")
+            if header_end < 0:
+                continue
+            header = bytes(buf[:header_end])
+            length = None
+            for line in header.split(b"\r\n"):
+                low = line.lower()
+                if low.startswith(b"content-length:"):
+                    try:
+                        length = int(line.split(b":", 1)[1].strip())
+                    except (ValueError, IndexError):
+                        return None
+                    break
+            if length is None or length <= 0 or length > AUTOPILOT_FRAME_MAX_BYTES:
+                return None
+            body_start = header_end + 4
+            if len(buf) < body_start + length:
+                continue
+            return bytes(buf[body_start : body_start + length])
+        return None
+
+    try:
+        # Per-iteration deadline: httpx's connect/read timeouts don't cover the
+        # async iteration over a streaming body, so a slow-trickling or stalled
+        # upstream could hang the autopilot tick. wait_for() bounds the whole pull.
+        return await asyncio.wait_for(_read_one(), timeout=AUTOPILOT_FRAME_TIMEOUT)
+    except (asyncio.TimeoutError, httpx.HTTPError) as e:
+        log.warning("autopilot frame read aborted: %s", e)
+        return None
+    finally:
+        await upstream.aclose()
+
+
+def _parse_autopilot_response(text: str) -> tuple[str | None, str]:
+    """Extract `command` / `reason` from the model's response.
+
+    Mirrors the pi-b reference: tolerant JSON parse with markdown-fence strip,
+    then a keyword-search fallback so a malformed turn doesn't stall the loop.
+    """
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        # Strip leading fence + optional language tag.
+        cleaned = cleaned.split("\n", 1)[-1] if "\n" in cleaned else cleaned[3:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+    cleaned = cleaned.strip()
+    if cleaned.lower().startswith("json"):
+        cleaned = cleaned[4:].strip()
+    # The model sometimes wraps JSON in extra prose; grab the first {...} block.
+    if not cleaned.startswith("{"):
+        lo = cleaned.find("{")
+        hi = cleaned.rfind("}")
+        if lo >= 0 and hi > lo:
+            cleaned = cleaned[lo : hi + 1]
+    try:
+        data = json.loads(cleaned)
+        cmd = str(data.get("command", "")).lower().strip()
+        reason = str(data.get("reason", "")).strip()
+        if cmd in AUTOPILOT_VALID_CMDS:
+            return cmd, reason
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        pass
+    # Fallback: keyword search with word-boundary so e.g. "background" doesn't
+    # match "back".
+    low = text.lower()
+    for cand in ("forward", "back", "left", "right", "stop"):
+        if re.search(rf"\b{cand}\b", low):
+            return cand, text[:120].strip()
+    return None, ""
+
+
+def _autopilot_log(state: dict[str, Any], command: str, reason: str, ok: bool) -> None:
+    state["decisions"].append(
+        {"ts": time.time(), "command": command, "reason": reason, "ok": ok}
+    )
+    if len(state["decisions"]) > AUTOPILOT_MAX_DECISIONS:
+        state["decisions"] = state["decisions"][-AUTOPILOT_MAX_DECISIONS:]
+
+
+async def _autopilot_loop() -> None:
+    """Background loop: frame → Gemini Robotics → command, until stopped."""
+    state = app.state.autopilot
+    cfg = state["config"]
+    prompt = (
+        AUTOPILOT_PROMPT_GOAL.format(goal=cfg["goal"])
+        if cfg["mode"] == "goal" and cfg["goal"]
+        else AUTOPILOT_PROMPT_FREE
+    )
+    # Reuse the existing genai client (built with GEMINI_API_KEY at startup).
+    client = app.state.genai
+    model = cfg["model"]
+
+    try:
+        while state["running"]:
+            try:
+                frame = await _grab_jpeg_frame()
+                if not frame:
+                    state["last_error"] = "no camera frame"
+                    await asyncio.sleep(1.0)
+                    continue
+
+                contents = [
+                    gtypes.Content(
+                        role="user",
+                        parts=[
+                            gtypes.Part(inline_data=gtypes.Blob(mime_type="image/jpeg", data=frame)),
+                            gtypes.Part(text=prompt),
+                        ],
+                    ),
+                ]
+                # Mirror the bash example: thinking=LOW + googleSearch tool.
+                # LOW keeps latency reasonable for a ~3s cadence. If a future
+                # SDK rename drops these symbols we log once and fall back to
+                # a plain config rather than silently dropping the features.
+                config_kwargs: dict[str, Any] = {"temperature": 0.3}
+                try:
+                    config_kwargs["thinking_config"] = gtypes.ThinkingConfig(thinking_level="LOW")
+                except (AttributeError, TypeError) as e:
+                    log.warning("autopilot: ThinkingConfig unavailable (%s); disabling", e)
+                try:
+                    config_kwargs["tools"] = [gtypes.Tool(google_search=gtypes.GoogleSearch())]
+                except (AttributeError, TypeError) as e:
+                    log.warning("autopilot: googleSearch tool unavailable (%s); disabling", e)
+
+                resp = await client.aio.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=gtypes.GenerateContentConfig(**config_kwargs),
+                )
+                text = resp.text or ""
+                command, reason = _parse_autopilot_response(text)
+
+                if not command:
+                    state["last_error"] = f"parse error: {text[:120]}"
+                    _autopilot_log(state, "error", state["last_error"], False)
+                else:
+                    ok = await _dispatch_command(command, src="autopilot")
+                    state["last_command"] = command
+                    state["last_reason"] = reason
+                    state["last_error"] = None if ok else "dispatch failed"
+                    _autopilot_log(state, command, reason, ok)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:  # noqa: BLE001 — keep loop alive on any error
+                log.exception("autopilot iteration failed")
+                state["last_error"] = str(e)[:200]
+                _autopilot_log(state, "error", state["last_error"], False)
+
+            await asyncio.sleep(max(1.0, float(cfg["interval"])))
+    except asyncio.CancelledError:
+        pass
+    finally:
+        state["running"] = False
+        # Safety: when we stop, the robot stops too.
+        await _dispatch_command("stop", src="autopilot")
+
+
+@app.post("/autopilot/start")
+async def autopilot_start(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    if app.state.genai is None:
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set on the api service")
+    ap = app.state.autopilot
+
+    body = body or {}
+    try:
+        interval = float(body.get("interval", ap["config"]["interval"]))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="interval must be a number") from None
+    interval = max(1.0, min(30.0, interval))
+    mode = body.get("mode") or "free"
+    if mode not in ("free", "goal"):
+        raise HTTPException(status_code=400, detail="mode must be 'free' or 'goal'")
+    goal = str(body.get("goal") or "")[:200]
+    model = str(body.get("model") or GEMINI_ROBOTICS_MODEL)[:80]
+
+    # Lock-guard: two concurrent /autopilot/start POSTs both pass the
+    # `running` check before either flips it, so without the lock both
+    # would launch a loop and the second would orphan the first task.
+    async with ap["lock"]:
+        if ap["running"]:
+            return {"status": "already_running", "config": ap["config"]}
+
+        # Make sure the camera is actually streaming — autopilot needs frames.
+        try:
+            await app.state.http.post(f"{ROOMBA_BASE}/camera/start", timeout=5.0)
+        except httpx.HTTPError:
+            # Non-fatal: the loop will surface a "no camera frame" error if needed.
+            pass
+
+        ap["config"] = {"interval": interval, "mode": mode, "goal": goal, "model": model}
+        ap["last_command"] = None
+        ap["last_reason"] = None
+        ap["last_error"] = None
+        ap["decisions"] = []
+        ap["running"] = True
+        ap["task"] = asyncio.create_task(_autopilot_loop())
+        return {"status": "started", "config": ap["config"]}
+
+
+@app.post("/autopilot/stop")
+async def autopilot_stop() -> dict[str, Any]:
+    ap = app.state.autopilot
+    async with ap["lock"]:
+        if not ap["running"]:
+            return {"status": "not_running"}
+        ap["running"] = False
+        task = ap.get("task")
+    # The await happens outside the lock so /status calls don't queue behind
+    # a slow Gemini iteration cooling down.
+    if task and not task.done():
+        # Prefer cooperative exit; the loop checks ap["running"] each tick
+        # and its finally sends one last "stop". Cancel only if it's stuck.
+        try:
+            await asyncio.wait_for(task, timeout=5.0)
+        except asyncio.TimeoutError:
+            task.cancel()
+            try:
+                await asyncio.wait_for(task, timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+        except asyncio.CancelledError:
+            pass
+    ap["task"] = None
+    return {"status": "stopped"}
+
+
+@app.get("/autopilot/status")
+async def autopilot_status() -> dict[str, Any]:
+    ap = app.state.autopilot
+    return {
+        "running": ap["running"],
+        "config": ap["config"],
+        "last_command": ap["last_command"],
+        "last_reason": ap["last_reason"],
+        "last_error": ap["last_error"],
+        "decisions": ap["decisions"],
+        "model_available": app.state.genai is not None,
+    }
 
 
 SYSTEM_INSTRUCTION = (
