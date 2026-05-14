@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import UplotReact from "uplot-react";
 import uPlot from "uplot";
 
-import { DPad } from "../components/DPad";
+import { Joystick } from "../components/Joystick";
 import { Slider } from "../components/Slider";
 import { NCH, LIVE_BUF_SEC, LIVE_HZ, AppState, Threshold } from "../types";
 
@@ -107,6 +107,41 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
         </div>
       </div>
 
+      <div className="panel cam-panel">
+        <div className="panel-head">
+          <h2>Camera</h2>
+          <div className="cam-controls">
+            <button className="btn small" onClick={async () => {
+              setCamStatus("loading");
+              await fetch(`${apiBase}/camera/start`, { method: "POST" });
+              setCamKey((k) => k + 1);
+              setCamOn(true);
+            }}>Start</button>
+            <button className="btn small stop" onClick={async () => {
+              setCamOn(false);
+              setCamStatus("idle");
+              await fetch(`${apiBase}/camera/stop`, { method: "POST" });
+            }}>Stop</button>
+          </div>
+        </div>
+        <div className="cam-area">
+          {camOn ? (
+            <>
+              <img src={`${apiBase}/camera/stream?t=${camKey}`} alt="camera" key={`cam-${camKey}`}
+                   onLoad={() => setCamStatus("live")}
+                   onError={() => setCamStatus("error")} />
+              {camStatus !== "live" && (
+                <div className="cam-overlay">
+                  {camStatus === "error" ? "stream failed — try Stop then Start" : "connecting to camera…"}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="cam-overlay">press Start to begin preview</div>
+          )}
+        </div>
+      </div>
+
       <div className="side">
         <div className="panel">
           <div className="panel-section">
@@ -125,62 +160,25 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
               <button className="btn small stop" onClick={() => fetch(`${apiBase}/control/disconnect`, { method: "POST" })}>disconnect</button>
             </div>
           </div>
-
-          <div className="panel-section">
-            <div className="panel-head">
-              <h2>Thresholds</h2>
-              <span className={`alpha-now ${zone}`}>α {curAlpha.toFixed(2)}</span>
-            </div>
-            <Slider label="enter" min={0} max={50} step={0.5}
-              value={state.threshold.enter} onChange={(v) => setThresh({ enter: v })} hint="α ≥ enter で active" />
-            <Slider label="exit" min={0} max={50} step={0.5}
-              value={state.threshold.exit} onChange={(v) => setThresh({ exit: v })} hint="α ≤ exit で idle" />
-            <Slider label="dwell" min={0} max={3000} step={50} unit="ms"
-              value={state.threshold.dwell_ms} onChange={(v) => setThresh({ dwell_ms: v })} hint="連続超過時間" />
-          </div>
         </div>
 
         <div className="panel">
           <div className="panel-head"><h2>Control</h2><small>arrows / space</small></div>
-          <DPad onCmd={cmd} />
+          <Joystick onCmd={cmd} />
         </div>
 
-        <details className="panel" open>
-          <summary style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", listStyle: "none" }}>
-            <h2 style={{ display: "inline" }}>Camera</h2>
-            <div className="cam-controls" onClick={(e) => e.preventDefault()}>
-              <button className="btn small" onClick={async (e) => {
-                e.stopPropagation();
-                setCamStatus("loading");
-                await fetch(`${apiBase}/camera/start`, { method: "POST" });
-                setCamKey((k) => k + 1);
-                setCamOn(true);
-              }}>Start</button>
-              <button className="btn small stop" onClick={async (e) => {
-                e.stopPropagation();
-                setCamOn(false);
-                setCamStatus("idle");
-                await fetch(`${apiBase}/camera/stop`, { method: "POST" });
-              }}>Stop</button>
-            </div>
-          </summary>
-          <div className="cam-area">
-            {camOn ? (
-              <>
-                <img src={`${apiBase}/camera/stream?t=${camKey}`} alt="camera" key={`cam-${camKey}`}
-                     onLoad={() => setCamStatus("live")}
-                     onError={() => setCamStatus("error")} />
-                {camStatus !== "live" && (
-                  <div className="cam-overlay">
-                    {camStatus === "error" ? "stream failed — try Stop then Start" : "connecting to camera…"}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="cam-overlay">press Start to begin preview</div>
-            )}
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Thresholds</h2>
+            <span className={`alpha-now ${zone}`}>α {curAlpha.toFixed(2)}</span>
           </div>
-        </details>
+          <Slider label="enter" min={0} max={50} step={0.5}
+            value={state.threshold.enter} onChange={(v) => setThresh({ enter: v })} hint="α ≥ enter で active" />
+          <Slider label="exit" min={0} max={50} step={0.5}
+            value={state.threshold.exit} onChange={(v) => setThresh({ exit: v })} hint="α ≤ exit で idle" />
+          <Slider label="dwell" min={0} max={3000} step={50} unit="ms"
+            value={state.threshold.dwell_ms} onChange={(v) => setThresh({ dwell_ms: v })} hint="連続超過時間" />
+        </div>
       </div>
     </div>
   );
