@@ -13,14 +13,14 @@ import {
   LIVE_HZ, NCH,
 } from "../types";
 
-export interface AnalysisTabProps {
+export interface PiEEGTabProps {
   state: AppState;
   liveBuf: React.MutableRefObject<{ ts: number[]; ch: number[][] }>;
   bandsBuf: React.MutableRefObject<{ ts: number[]; bands: Record<BandName, number[][]> }>;
   tick: number;
 }
 
-export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
+export function PiEEG({ state, liveBuf, bandsBuf, tick }: PiEEGTabProps) {
   void tick;
   const [ch, setCh] = useState(6);
   const [band, setBand] = useState<BandName>("alpha");
@@ -99,6 +99,24 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
   const bandMax = Math.max(1, ...bandsHere.map((x) => x.value));
 
   const topoValues = state.bandsNow[band];
+
+  // Cognitive metrics averaged over the decision channels (the ones the
+  // user has marked as relevant for the α-based control loop).
+  const decisionChs = state.threshold.channels.length ? state.threshold.channels : [6, 7];
+  const meanOver = (arr: number[], chs: number[]) =>
+    chs.reduce((s, c) => s + (arr[c] ?? 0), 0) / Math.max(1, chs.length);
+  const meanAlpha = meanOver(state.bandsNow.alpha, decisionChs);
+  const meanBeta  = meanOver(state.bandsNow.beta,  decisionChs);
+  const meanTheta = meanOver(state.bandsNow.theta, decisionChs);
+  const engagement = meanBeta / Math.max(1e-9, meanAlpha + meanTheta);
+  const alphaBeta = meanAlpha / Math.max(1e-9, meanBeta);
+  // Frontal alpha asymmetry: log10(α_right / α_left) using F4 (ch3) - F3 (ch2).
+  // Davidson model: positive ≈ approach motivation, negative ≈ withdrawal.
+  const f3Alpha = state.bandsNow.alpha[2] ?? 0;
+  const f4Alpha = state.bandsNow.alpha[3] ?? 0;
+  const frontalAsym = (f3Alpha > 0 && f4Alpha > 0)
+    ? Math.log10(f4Alpha / f3Alpha)
+    : NaN;
 
   return (
     <div className="analysis-wrap">
@@ -185,6 +203,43 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
         </div>
         <CorrelationMatrix matrix={corr} selected={state.threshold.channels} />
       </div>
+
+      <div className="panel full cog-panel">
+        <div className="panel-head">
+          <h2>Cognitive metrics</h2>
+          <small>over decision chs {decisionChs.map((c) => `ch${c}`).join(", ")} · frontal asym uses F3/F4</small>
+        </div>
+        <div className="cog-grid">
+          <Stat label="Engagement"
+                value={engagement.toFixed(2)}
+                hint="β / (α + θ) · ↑ focus, ↓ relax" />
+          <Stat label="α / β"
+                value={alphaBeta.toFixed(2)}
+                hint="↑ relaxed, ↓ alert" />
+          <Stat label="Frontal α asym"
+                value={isNaN(frontalAsym) ? "—" : frontalAsym.toFixed(3)}
+                hint="log₁₀(F4/F3) · + approach / − withdrawal" />
+          <Stat label="α (decision chs)"
+                value={formatSI(meanAlpha)}
+                hint={`mean over ${decisionChs.length} ch`} />
+          <Stat label="β (decision chs)"
+                value={formatSI(meanBeta)}
+                hint={`mean over ${decisionChs.length} ch`} />
+          <Stat label="θ (decision chs)"
+                value={formatSI(meanTheta)}
+                hint={`mean over ${decisionChs.length} ch`} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="cog-stat">
+      <div className="cog-stat-label">{label}</div>
+      <div className="cog-stat-value">{value}</div>
+      <div className="cog-stat-hint">{hint}</div>
     </div>
   );
 }

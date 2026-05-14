@@ -1,8 +1,14 @@
-import { useMemo } from "react";
-import { TrajectoryStep } from "../types";
+import { useMemo, useState } from "react";
 
-export interface TrajectoryTabProps {
+import { Joystick } from "../components/Joystick";
+import { AppState, TrajectoryStep } from "../types";
+
+export interface RoombaTabProps {
+  state: AppState;
   history: TrajectoryStep[];
+  apiBase: string;
+  camOn: boolean;
+  setCamOn: (v: boolean) => void;
 }
 
 interface Point { x: number; y: number; heading: number; t: number; cmd: string; ok: boolean }
@@ -12,7 +18,7 @@ const TURN_DEG = 30;         // degrees per turn command
 
 function buildPath(history: TrajectoryStep[]): Point[] {
   const out: Point[] = [];
-  let x = 0, y = 0, heading = -90; // facing up (-y is up in SVG, so heading -90 = +y up)
+  let x = 0, y = 0, heading = -90;
   let prevTs = history[0]?.ts ?? 0;
   for (const ev of history) {
     if (!ev.ok) continue;
@@ -37,9 +43,17 @@ function buildPath(history: TrajectoryStep[]): Point[] {
   return out;
 }
 
-export function Trajectory({ history }: TrajectoryTabProps) {
-  const path = useMemo(() => buildPath(history), [history]);
+export function Roomba({ state, history, apiBase, camOn, setCamOn }: RoombaTabProps) {
+  const [camKey, setCamKey] = useState(0);
+  const [camStatus, setCamStatus] = useState<"idle" | "loading" | "live" | "error">(
+    camOn ? "loading" : "idle"
+  );
 
+  const cmd = (c: string) => {
+    fetch(`${apiBase}/control/${c}`, { method: "POST" }).catch(() => {});
+  };
+
+  const path = useMemo(() => buildPath(history), [history]);
   let minX = -100, maxX = 100, minY = -100, maxY = 100;
   for (const p of path) {
     if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
@@ -49,36 +63,87 @@ export function Trajectory({ history }: TrajectoryTabProps) {
   const h = Math.max(200, maxY - minY + 40);
   const cx = -(minX - 20);
   const cy = -(minY - 20);
-
-  const lastCmds = history.slice(-8).reverse();
   const last = path[path.length - 1];
+  const lastCmds = history.slice(-12).reverse();
 
   return (
-    <div className="traj-wrap">
-      <div className="panel">
+    <div className="roomba-wrap">
+      <div className="panel cam-panel">
         <div className="panel-head">
-          <h2>Roomba trajectory (dead-reckoned)</h2>
+          <h2>Camera</h2>
+          <div className="cam-controls">
+            <button className="btn small" onClick={async () => {
+              setCamStatus("loading");
+              await fetch(`${apiBase}/camera/start`, { method: "POST" }).catch(() => {});
+              setCamKey((k) => k + 1);
+              setCamOn(true);
+            }}>Start</button>
+            <button className="btn small stop" onClick={async () => {
+              setCamOn(false);
+              setCamStatus("idle");
+              await fetch(`${apiBase}/camera/stop`, { method: "POST" }).catch(() => {});
+            }}>Stop</button>
+          </div>
+        </div>
+        <div className="cam-area">
+          {camOn ? (
+            <>
+              <img src={`${apiBase}/camera/stream?t=${camKey}`} alt="camera" key={`cam-${camKey}`}
+                   onLoad={() => setCamStatus("live")}
+                   onError={() => setCamStatus("error")} />
+              {camStatus !== "live" && (
+                <div className="cam-overlay">
+                  {camStatus === "error" ? "stream failed — try Stop then Start" : "connecting to camera…"}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="cam-overlay">press Start to begin preview</div>
+          )}
+        </div>
+      </div>
+
+      <div className="side">
+        <div className="panel">
+          <div className="panel-head"><h2>Status</h2></div>
+          <div className="kv">
+            <span>Roomba</span>
+            <span className={`pill ${state.roombaOk ? "ok" : "bad"}`}>{state.roombaOk ? "online" : "offline"}</span>
+          </div>
+          <div className="row" style={{ marginTop: 10, gap: 6 }}>
+            <button className="btn small" onClick={() => fetch(`${apiBase}/control/connect`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })}>connect</button>
+            <button className="btn small stop" onClick={() => fetch(`${apiBase}/control/disconnect`, { method: "POST" })}>disconnect</button>
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-head"><h2>Control</h2><small>arrows / space</small></div>
+          <Joystick onCmd={cmd} />
+        </div>
+      </div>
+
+      <div className="panel traj-map-panel">
+        <div className="panel-head">
+          <h2>Trajectory (dead-reckoned)</h2>
           <small>{history.length} events</small>
         </div>
         <div className="traj-canvas">
-          <svg viewBox={`0 0 ${w} ${h}`} width="100%" style={{ aspectRatio: w / h, background: "var(--surface-2)", borderRadius: 6 }}>
+          <svg viewBox={`0 0 ${w} ${h}`} width="100%"
+               style={{ aspectRatio: w / h, background: "var(--surface-2)", borderRadius: 6 }}>
             {Array.from({ length: Math.ceil(w / 40) + 1 }).map((_, i) => (
               <line key={`v${i}`} x1={i * 40} y1={0} x2={i * 40} y2={h} stroke="var(--border)" strokeWidth={1} opacity={0.4} />
             ))}
             {Array.from({ length: Math.ceil(h / 40) + 1 }).map((_, i) => (
               <line key={`h${i}`} x1={0} y1={i * 40} x2={w} y2={i * 40} stroke="var(--border)" strokeWidth={1} opacity={0.4} />
             ))}
-
             <circle cx={cx} cy={cy} r={5} fill="var(--ok)" stroke="var(--bg)" strokeWidth={2} />
             <text x={cx + 10} y={cy + 4} fontSize={11} fill="var(--muted)">start</text>
-
             {path.length > 1 && (
               <polyline
                 points={path.map((p) => `${p.x + cx},${p.y + cy}`).join(" ")}
                 fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round"
               />
             )}
-
             {last && (
               <g transform={`translate(${last.x + cx}, ${last.y + cy}) rotate(${last.heading + 90})`}>
                 <polygon points="-7,7 7,7 0,-10" fill="var(--bad)" stroke="var(--bg)" strokeWidth={1.5} />
@@ -87,7 +152,7 @@ export function Trajectory({ history }: TrajectoryTabProps) {
           </svg>
         </div>
         <div className="traj-meta">
-          <small>+forward = direction of nose. Step length and turn angle are illustrative (no odometry from Roomba).</small>
+          <small>+forward = direction of nose. Step length / turn angle illustrative (no odometry).</small>
         </div>
       </div>
 

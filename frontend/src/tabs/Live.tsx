@@ -1,8 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import uPlot from "uplot";
 
 import { AutoChart } from "../components/AutoChart";
-import { Joystick } from "../components/Joystick";
 import { Slider } from "../components/Slider";
 import { formatSI } from "../format";
 import { themeColors } from "../theme";
@@ -12,16 +11,11 @@ export interface LiveTabProps {
   state: AppState;
   liveBuf: React.MutableRefObject<{ ts: number[]; ch: number[][] }>;
   tick: number;            // 200ms force-render counter, just to trigger re-render
-  apiBase: string;
   setThresh: (patch: Partial<Threshold>) => void;
-  camOn: boolean;
-  setCamOn: (v: boolean) => void;
 }
 
-export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn }: LiveTabProps) {
+export function Live({ state, liveBuf, tick, setThresh }: LiveTabProps) {
   void tick; // dep only
-  const [camKey, setCamKey] = useState(0);          // bumped per Start to force <img> remount
-  const [camStatus, setCamStatus] = useState<"idle" | "loading" | "live" | "error">("idle");
 
   const buf = liveBuf.current;
   const chartData = useMemo<uPlot.AlignedData>(() => {
@@ -64,14 +58,6 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChs.join(",")]);
-
-  const cmd = (c: string) => {
-    // Fire-and-forget. Joystick UX is sensitive to round-trip latency and
-    // pi-b's roomba-api blocks ~100ms on every Arduino response. The API
-    // acks immediately and publishes the actual outcome to MQTT, so
-    // Trajectory still records success/failure asynchronously.
-    fetch(`${apiBase}/control/${c}`, { method: "POST" }).catch(() => {});
-  };
 
   const curAlpha = selectedChs.length
     ? selectedChs.reduce((a, c) => a + (state.bandsNow.alpha[c] ?? 0), 0) / selectedChs.length
@@ -120,41 +106,6 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
         </div>
       </div>
 
-      <div className="panel cam-panel">
-        <div className="panel-head">
-          <h2>Camera</h2>
-          <div className="cam-controls">
-            <button className="btn small" onClick={async () => {
-              setCamStatus("loading");
-              await fetch(`${apiBase}/camera/start`, { method: "POST" });
-              setCamKey((k) => k + 1);
-              setCamOn(true);
-            }}>Start</button>
-            <button className="btn small stop" onClick={async () => {
-              setCamOn(false);
-              setCamStatus("idle");
-              await fetch(`${apiBase}/camera/stop`, { method: "POST" });
-            }}>Stop</button>
-          </div>
-        </div>
-        <div className="cam-area">
-          {camOn ? (
-            <>
-              <img src={`${apiBase}/camera/stream?t=${camKey}`} alt="camera" key={`cam-${camKey}`}
-                   onLoad={() => setCamStatus("live")}
-                   onError={() => setCamStatus("error")} />
-              {camStatus !== "live" && (
-                <div className="cam-overlay">
-                  {camStatus === "error" ? "stream failed — try Stop then Start" : "connecting to camera…"}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="cam-overlay">press Start to begin preview</div>
-          )}
-        </div>
-      </div>
-
       <div className="side">
         <div className="panel">
           <div className="panel-section">
@@ -168,16 +119,7 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
               <span>Roomba<span className="kv-hint">{!state.roombaOk && " — bridge offline"}</span></span>
               <span className={`pill ${state.roombaOk ? "ok" : "bad"}`}>{state.roombaOk ? "online" : "offline"}</span>
             </div>
-            <div className="row" style={{ marginTop: 10, gap: 6 }}>
-              <button className="btn small" onClick={() => fetch(`${apiBase}/control/connect`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })}>connect</button>
-              <button className="btn small stop" onClick={() => fetch(`${apiBase}/control/disconnect`, { method: "POST" })}>disconnect</button>
-            </div>
           </div>
-        </div>
-
-        <div className="panel">
-          <div className="panel-head"><h2>Control</h2><small>arrows / space</small></div>
-          <Joystick onCmd={cmd} />
         </div>
 
         <div className="panel">
