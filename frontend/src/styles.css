@@ -91,23 +91,93 @@ body {
 }
 .side { display: flex; flex-direction: column; gap: 20px; }
 
-/* Roomba tab — camera dominates the left, control side on the right,
-   trajectory + recent commands wrap underneath. */
+/* Roomba tab — camera, trajectory map, joystick all in one row.
+   Recent-commands table wraps to a full-width row below. */
 .roomba-wrap {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 320px;
   grid-template-areas:
-    "cam   ctrl"
-    "traj  cmds";
-  gap: 20px;
+    "cam  traj  ctrl"
+    "cmds cmds  cmds";
+  gap: 16px;
   align-items: start;
 }
-.roomba-wrap > .cam-panel       { grid-area: cam; }
-.roomba-wrap > .side            { grid-area: ctrl; }
-.roomba-wrap > .traj-map-panel  { grid-area: traj; }
+.roomba-wrap > .cam-panel          { grid-area: cam; }
+.roomba-wrap > .traj-map-panel     { grid-area: traj; }
+.roomba-wrap > .side               { grid-area: ctrl; }
 .roomba-wrap > .panel:last-of-type { grid-area: cmds; }
-@media (max-width: 1200px) {
-  .roomba-wrap { grid-template-columns: 1fr; grid-template-areas: "cam" "ctrl" "traj" "cmds"; }
+@media (max-width: 1400px) {
+  .roomba-wrap {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas:
+      "cam  ctrl"
+      "traj ctrl"
+      "cmds cmds";
+  }
+}
+@media (max-width: 1000px) {
+  .roomba-wrap {
+    grid-template-columns: 1fr;
+    grid-template-areas: "cam" "traj" "ctrl" "cmds";
+  }
+}
+
+/* Per-channel bands grid (pieeg tab) — 16 channels × 5 bands */
+.bands-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 1500px) { .bands-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 800px)  { .bands-grid { grid-template-columns: repeat(2, 1fr); } }
+.bg-cell {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px 4px;
+  min-width: 0;
+}
+.bg-cell.selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+}
+.bg-cell-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11px; margin-bottom: 6px;
+}
+.bg-cell-ch { color: var(--text); font-weight: 500; letter-spacing: .04em; }
+.bg-cell.selected .bg-cell-ch { color: var(--accent); }
+.bg-cell-electrode {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+.bg-cell-bars {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  align-items: end;
+  gap: 3px;
+  height: 56px;
+}
+.bg-bar {
+  position: relative;
+  height: 100%;
+  background: rgba(255,255,255,0.03);
+  border-radius: 3px;
+  overflow: hidden;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.bg-bar-fill {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  opacity: .78;
+  transition: height .2s ease-out;
+}
+.bg-bar-label {
+  position: relative;
+  font-size: 9px;
+  color: var(--muted);
+  z-index: 1;
+  margin-bottom: 1px;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.5);
 }
 
 /* Cognitive metrics panel on the pieeg tab */
