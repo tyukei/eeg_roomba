@@ -119,20 +119,26 @@ body {
 .live-wrap .panel { padding: 10px 12px; }
 .live-wrap .panel-head { margin-bottom: 6px; }
 .live-wrap .panel-head h2 { font-size: 11px; }
-/* Decision hero — compact variant for the dashboard banner. Drops from
- * 48 → 30 px state text and tightens padding so it stops dominating
- * vertical space. */
+/* Decision hero — compact variant for the dashboard banner. 36 px keeps
+ * dominance on the busy dashboard view (30 px got skimmed past) while
+ * still being shorter than the original full-page 48 px treatment. */
 .live-wrap .decision-hero {
-  padding: 10px 18px 10px 22px;
+  padding: 12px 18px 12px 22px;
 }
-.live-wrap .decision-hero-state { font-size: 30px; }
+.live-wrap .decision-hero-state { font-size: 36px; }
 .live-wrap .decision-hero-label { font-size: 10px; }
 .live-wrap .decision-hero-sub { font-size: 12px; }
 
 /* Mind 3D inside the narrow middle column — shrink the canvas so it
- * fits without forcing the column wider. */
+ * fits without forcing the column wider. At 1-col fallback (900 px and
+ * below), the canvas would otherwise look like a toy at 200 px on a
+ * full-width mobile view, so let it grow back to 320 px. */
 .live-wrap .mind3d-canvas,
 .live-wrap .mind3d-loading { height: 200px; }
+@media (max-width: 900px) {
+  .live-wrap .mind3d-canvas,
+  .live-wrap .mind3d-loading { height: 320px; }
+}
 
 /* Camera + traj-map compact variants for the side column. */
 .cam-panel-compact .cam-area { max-height: 180px; aspect-ratio: 4 / 3; }

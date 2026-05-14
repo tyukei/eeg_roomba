@@ -56,7 +56,10 @@ export function Live({
         <div className="decision-hero-sub">{decisionLine}</div>
       </div>
 
-      {/* Column 1 — wide-friendly content (16-ch sparkline grid + α bars). */}
+      {/* Column 1 — raw biometric signals: EEG live, α power, heart rate.
+       * HR lives here (not in col 2 with derived cognitive metrics)
+       * because the BCG-derived BPM is a direct signal from the same
+       * EEG stream, not a derived index. */}
       <div className="live-col">
         <div className="panel">
           <div className="panel-head">
@@ -91,9 +94,17 @@ export function Live({
             ))}
           </div>
         </div>
+
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Heart rate</h2>
+            <small>EEG-derived</small>
+          </div>
+          <HeartRate liveBuf={liveBuf} tick={tick} />
+        </div>
       </div>
 
-      {/* Column 2 — cognitive metrics (Mind state + 3D trajectory + HR). */}
+      {/* Column 2 — derived cognitive metrics (Mind state + 3D trajectory). */}
       <div className="live-col">
         <div className="panel">
           <div className="panel-head">
@@ -111,14 +122,6 @@ export function Live({
           <Suspense fallback={<div className="mind3d-loading">3D loading…</div>}>
             <MindTrajectory3D bandsBuf={bandsBuf} tick={tick} />
           </Suspense>
-        </div>
-
-        <div className="panel">
-          <div className="panel-head">
-            <h2>Heart rate</h2>
-            <small>EEG-derived</small>
-          </div>
-          <HeartRate liveBuf={liveBuf} tick={tick} />
         </div>
       </div>
 
