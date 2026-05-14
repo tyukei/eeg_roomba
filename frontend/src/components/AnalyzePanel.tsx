@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 
 interface Props {
@@ -13,20 +13,23 @@ export function AnalyzePanel({ apiBase, targetRef }: Props) {
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<string>("");
   const [err, setErr] = useState<string>("");
-  const lastAtRef = useRef<number>(0);
+  const [cooldown, setCooldown] = useState(false);   // throttle window — button disabled
+
+  useEffect(() => {
+    if (!cooldown) return;
+    const t = window.setTimeout(() => setCooldown(false), 1500);
+    return () => window.clearTimeout(t);
+  }, [cooldown]);
 
   const run = async () => {
-    if (status === "capturing" || status === "analyzing") return;
+    if (status === "capturing" || status === "analyzing" || cooldown) return;
     const target = targetRef.current;
     if (!target) {
       setErr("nothing to capture");
       setStatus("error");
       return;
     }
-    // Light throttle so a runaway click doesn't burn quota.
-    const now = Date.now();
-    if (now - lastAtRef.current < 1500) return;
-    lastAtRef.current = now;
+    setCooldown(true);
 
     setErr("");
     setStatus("capturing");
@@ -57,15 +60,17 @@ export function AnalyzePanel({ apiBase, targetRef }: Props) {
   };
 
   const busy = status === "capturing" || status === "analyzing";
+  const disabled = busy || cooldown;
   const cta = status === "capturing" ? "capturing…"
             : status === "analyzing" ? "Gemini analyzing…"
+            : cooldown ? "wait…"
             : "Analyze";
 
   return (
     <div className="panel full analyze-panel">
       <div className="panel-head">
         <h2>AI insight</h2>
-        <button className="btn small" onClick={run} disabled={busy}>{cta}</button>
+        <button className="btn small" onClick={run} disabled={disabled}>{cta}</button>
       </div>
       {status === "idle" && (
         <div className="analyze-hint">
