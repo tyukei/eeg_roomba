@@ -164,10 +164,18 @@ function RotatingHead({ tint, children }: { tint: string; children: React.ReactN
 
 /**
  * Tiny anatomy hints — a nose, two eyes, two ears — so the operator can
- * tell at a glance which side is the front. Anatomy reminder:
- *   eyes ABOVE the nose tip, ears on the SIDE of the head.
- *   Cone geometry's apex defaults to +Y; rotating +π/2 on X makes it
- *   point along +Z (toward the camera in the default view).
+ * tell at a glance which side is the front.
+ *
+ * The brain dome sits in y >= 0; the face lives BELOW the dome (y < 0)
+ * because anatomically the brain is inside the upper skull and the face
+ * is below it. From the operator's perspective: scan top-to-bottom →
+ * dome (cortex) → eyes/ears → nose.
+ *
+ *   eyes just below the dome rim (y ~ -0.05),
+ *   ears on the side at roughly eye height,
+ *   nose tip below the eyes (y ~ -0.22).
+ *   Cone apex defaults to +Y; rotating +π/2 on X makes it point along
+ *   +Z (toward the camera in the default view).
  * Convention matches montage.ts:lift3D — +x = right ear, +y = top of head,
  * +z = nose / forward.
  */
@@ -179,32 +187,30 @@ function FaceMarkers() {
 
   return (
     <group>
-      {/* Nose — apex points forward (+Z). Sits low on the face, *below*
-       *  the eye line, matching real anatomy. */}
-      <mesh position={[0, 0.02, 1.0]} rotation={[Math.PI / 2, 0, 0]}>
+      {/* Eyes — small dark spheres just under the dome's front rim.
+       *  Above the nose tip, level with the ears (matches anatomy). */}
+      <mesh position={[-0.22, -0.05, 0.92]}>
+        <sphereGeometry args={[0.05, 12, 12]} />
+        <meshBasicMaterial color={PUPIL} />
+      </mesh>
+      <mesh position={[0.22, -0.05, 0.92]}>
+        <sphereGeometry args={[0.05, 12, 12]} />
+        <meshBasicMaterial color={PUPIL} />
+      </mesh>
+
+      {/* Nose — apex points forward (+Z). Sits below the eye line. */}
+      <mesh position={[0, -0.22, 0.9]} rotation={[Math.PI / 2, 0, 0]}>
         <coneGeometry args={[0.055, 0.16, 12]} />
         <meshBasicMaterial color={SKIN} />
       </mesh>
 
-      {/* Eyes — small dark spheres ABOVE the nose, near the front of the
-       *  dome. They face +Z so they're only visible from the front. */}
-      <mesh position={[-0.22, 0.18, 0.92]}>
-        <sphereGeometry args={[0.05, 12, 12]} />
-        <meshBasicMaterial color={PUPIL} />
-      </mesh>
-      <mesh position={[0.22, 0.18, 0.92]}>
-        <sphereGeometry args={[0.05, 12, 12]} />
-        <meshBasicMaterial color={PUPIL} />
-      </mesh>
-
-      {/* Ears — torus rings on the side, hole facing outward (visible from
-       *  the side view). Sat slightly below the dome's equator so they
-       *  read as ears rather than parietal electrodes. */}
-      <mesh position={[-0.95, 0.05, 0]} rotation={[0, Math.PI / 2, 0]}>
+      {/* Ears — torus rings on the side, level with the eyes, hole facing
+       *  outward (visible from the side view). */}
+      <mesh position={[-0.95, -0.05, 0]} rotation={[0, Math.PI / 2, 0]}>
         <torusGeometry args={[0.1, 0.035, 10, 24]} />
         <meshBasicMaterial color={SKIN} />
       </mesh>
-      <mesh position={[0.95, 0.05, 0]} rotation={[0, Math.PI / 2, 0]}>
+      <mesh position={[0.95, -0.05, 0]} rotation={[0, Math.PI / 2, 0]}>
         <torusGeometry args={[0.1, 0.035, 10, 24]} />
         <meshBasicMaterial color={SKIN} />
       </mesh>
@@ -278,7 +284,9 @@ export default function BrainParticles3D({
   return (
     <div className="brain3d-canvas">
       <Canvas
-        camera={{ position: [0, 0.45, 2.8], fov: 45 }}
+        // Camera centred between the dome top (y≈0.7) and the nose tip
+        // (y≈-0.3) so both the brain and the face fit in frame.
+        camera={{ position: [0, 0.2, 3.0], fov: 45 }}
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: true }}
       >
