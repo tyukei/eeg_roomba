@@ -284,8 +284,9 @@ export default function BrainParticles3D({
   return (
     <div className="brain3d-canvas">
       <Canvas
-        // Camera centred between the dome top (y≈0.7) and the nose tip
-        // (y≈-0.3) so both the brain and the face fit in frame.
+        // Camera centred roughly between the dome top (y≈1.0 — unit-radius
+        // upper hemisphere scaled by BRAIN_RY) and the nose tip (y≈-0.3)
+        // so both the brain and the face fit in frame.
         camera={{ position: [0, 0.2, 3.0], fov: 45 }}
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: true }}

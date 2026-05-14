@@ -853,7 +853,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 }
 .analysis-wrap .chart { width: 100%; height: 180px; }
 .analysis-wrap .electrode-table-wrap {
-  max-height: 140px; overflow: auto;
+  /* Enough rows that the user can scan the 16-ch list at a glance
+   * without scrolling — 140 px was too tight (~4 rows out of 16). */
+  max-height: 200px; overflow: auto;
 }
 
 @media (max-width: 640px) {

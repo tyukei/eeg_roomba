@@ -234,28 +234,6 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         </ExpandablePanel>
 
         <ExpandablePanel
-          title="Band power · 60s"
-          dataPanel="Band power 60s"
-          headExtras={(
-            <div className="row" style={{ gap: 8 }}>
-              <label className="small-label">ch:
-                <select value={ch} onChange={(e) => setCh(Number(e.target.value))}>
-                  {Array.from({ length: NCH }, (_, i) => (<option key={i} value={i}>ch{i}</option>))}
-                </select>
-              </label>
-              <label className="small-label">y:
-                <select value={scale} onChange={(e) => setScale(e.target.value as any)}>
-                  <option value="linear">linear</option>
-                  <option value="log">log</option>
-                </select>
-              </label>
-            </div>
-          )}
-        >
-          <div className="chart"><AutoChart baseOpts={bandsOpts} data={bandsData} /></div>
-        </ExpandablePanel>
-
-        <ExpandablePanel
           title={<>PSD · ch{ch}</>}
           subtitle="Welch · 10s · log y"
           dataPanel="PSD"
@@ -299,26 +277,39 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         </ExpandablePanel>
 
         <ExpandablePanel
-          title={<>Time × Channel · {band}</>}
-          subtitle="60s history · newest on the right"
-          dataPanel="Time × Channel heatmap"
-          wide
-        >
-          <TimeChannelHeatmap
-            bandsBuf={bandsBuf}
-            band={band}
-            tick={tick}
-            hovered={hoveredCh}
-            onHover={setHoveredCh}
-          />
-        </ExpandablePanel>
-
-        <ExpandablePanel
           title="Channel correlation · 10s"
           subtitle="Pearson r · ±1 = synced"
           dataPanel="Channel correlation"
         >
           <CorrelationMatrix matrix={corr} selected={state.threshold.channels} />
+        </ExpandablePanel>
+
+        {/* ----- wide panels at the bottom — these break the column flow
+                  with `column-span: all` and stack as full-width bands.
+                  Grouped here so the narrow tiles above form one coherent
+                  masonry block rather than getting split by mid-list wides. */}
+
+        <ExpandablePanel
+          title="Band power · 60s"
+          dataPanel="Band power 60s"
+          wide
+          headExtras={(
+            <div className="row" style={{ gap: 8 }}>
+              <label className="small-label">ch:
+                <select value={ch} onChange={(e) => setCh(Number(e.target.value))}>
+                  {Array.from({ length: NCH }, (_, i) => (<option key={i} value={i}>ch{i}</option>))}
+                </select>
+              </label>
+              <label className="small-label">y:
+                <select value={scale} onChange={(e) => setScale(e.target.value as any)}>
+                  <option value="linear">linear</option>
+                  <option value="log">log</option>
+                </select>
+              </label>
+            </div>
+          )}
+        >
+          <div className="chart"><AutoChart baseOpts={bandsOpts} data={bandsData} /></div>
         </ExpandablePanel>
 
         <ExpandablePanel
@@ -330,6 +321,21 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
           <ChannelGrid
             liveBuf={liveBuf}
             selected={state.threshold.channels}
+            tick={tick}
+            hovered={hoveredCh}
+            onHover={setHoveredCh}
+          />
+        </ExpandablePanel>
+
+        <ExpandablePanel
+          title={<>Time × Channel · {band}</>}
+          subtitle="60s history · newest on the right"
+          dataPanel="Time × Channel heatmap"
+          wide
+        >
+          <TimeChannelHeatmap
+            bandsBuf={bandsBuf}
+            band={band}
             tick={tick}
             hovered={hoveredCh}
             onHover={setHoveredCh}
