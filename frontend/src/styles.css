@@ -813,7 +813,13 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   flex-direction: column;
   gap: 6px;
 }
+/* Danger surface for the panic button — explicit darker red so white text
+ * lands at WCAG AA contrast (the muted `--bad` token is tuned for pills
+ * and text on the dark surface, not as a full background for white text). */
 .estop-btn {
+  --estop-red: #b3261e;        /* ~5.0:1 contrast vs white @ 18px */
+  --estop-red-hi: #c3372f;
+  --estop-red-lo: #8a1c16;
   width: 100%;
   padding: 14px 18px;
   font-size: 18px;
@@ -821,22 +827,27 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #fff;
-  background: var(--bad);
-  border: 2px solid color-mix(in srgb, var(--bad) 70%, #000);
+  background: var(--estop-red);
+  border: 2px solid var(--estop-red-lo);
   border-radius: 6px;
   cursor: pointer;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bad) 30%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--estop-red) 30%, transparent);
   transition: background 0.12s, transform 0.06s;
 }
 .estop-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--bad) 85%, #fff);
+  background: var(--estop-red-hi);
 }
 .estop-btn:active:not(:disabled) {
   transform: scale(0.985);
-  background: color-mix(in srgb, var(--bad) 75%, #000);
+  background: var(--estop-red-lo);
 }
 .estop-btn:disabled {
-  opacity: 0.6;
+  /* Use an explicit busy surface instead of opacity so "stopping…" stays
+   * legible. Cursor flips to progress so the user knows the click registered. */
+  background: var(--surface-2);
+  color: var(--muted);
+  border-color: var(--border);
+  box-shadow: none;
   cursor: progress;
 }
 .estop-flash {
@@ -844,6 +855,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   padding: 6px 10px;
   border-radius: 4px;
   border: 1px solid var(--border);
+  cursor: pointer;
 }
 .estop-flash.ok {
   color: var(--ok);

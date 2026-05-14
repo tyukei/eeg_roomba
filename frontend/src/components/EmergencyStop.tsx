@@ -11,6 +11,7 @@ export function EmergencyStop({ apiBase }: EmergencyStopProps) {
   const fire = async () => {
     setBusy(true);
     setFlash(null);
+    let scheduleAutoClear = false;
     try {
       const r = await fetch(`${apiBase}/emergency-stop`, { method: "POST" });
       if (!r.ok) {
@@ -19,7 +20,9 @@ export function EmergencyStop({ apiBase }: EmergencyStopProps) {
       }
       const body = await r.json().catch(() => null);
       // Server always returns 200 with a per-step status map. Treat anything
-      // missing or error-prefixed as a partial failure so the operator knows.
+      // error-prefixed as a partial failure so the operator knows which
+      // subsystem to investigate. `queued` (roomba_stop fire-and-forget) is
+      // a healthy success state — the API doesn't block on the upstream POST.
       const failed =
         body &&
         Object.values(body).some(
@@ -31,15 +34,20 @@ export function EmergencyStop({ apiBase }: EmergencyStopProps) {
           ? `partial stop — check ${Object.entries(body)
               .filter(([, v]) => typeof v === "string" && (v as string).startsWith("error"))
               .map(([k]) => k)
-              .join(", ")}`
+              .join(", ")} (click to dismiss)`
           : "STOPPED · autopilot off · α-trigger disarmed · Roomba halted",
       });
+      // Auto-clear the green banner so the next manual action isn't shadowed.
+      // Partial-failure banners stay until the user dismisses them — they
+      // describe action the operator needs to take.
+      scheduleAutoClear = !failed;
     } catch (e: any) {
-      setFlash({ ok: false, text: `E-STOP failed: ${e?.message ?? e}` });
+      setFlash({ ok: false, text: `E-STOP failed: ${e?.message ?? e} (click to dismiss)` });
     } finally {
       setBusy(false);
-      // Auto-clear the banner so it doesn't shadow the next manual action.
-      setTimeout(() => setFlash(null), 6000);
+      if (scheduleAutoClear) {
+        setTimeout(() => setFlash(null), 6000);
+      }
     }
   };
 
@@ -52,13 +60,15 @@ export function EmergencyStop({ apiBase }: EmergencyStopProps) {
         disabled={busy}
         aria-label="Emergency stop: halt autopilot, disarm α-trigger, stop Roomba"
       >
-        {busy ? "stopping…" : "⏹ EMERGENCY STOP"}
+        {busy ? "stopping…" : "EMERGENCY STOP"}
       </button>
       {flash && (
         <div
           className={`estop-flash ${flash.ok ? "ok" : "bad"}`}
           role={flash.ok ? "status" : "alert"}
           aria-live={flash.ok ? "polite" : "assertive"}
+          onClick={() => setFlash(null)}
+          title="click to dismiss"
         >
           {flash.text}
         </div>

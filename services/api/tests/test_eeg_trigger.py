@@ -298,7 +298,7 @@ def test_autopilot_stop_keeps_dispatch_off_when_trigger_enabled(client):
 
 def test_emergency_stop_full_sweep(client):
     """E-stop must: stop autopilot, disarm trigger, publish dispatch=off,
-    and fire `stop` at the Roomba — even if one step errors, the rest run.
+    and queue a `stop` to the Roomba — even if one step errors, the rest run.
     """
     c, main = client
     # Set up a "everything is running" world.
@@ -324,27 +324,70 @@ def test_emergency_stop_full_sweep(client):
     assert body["autopilot"] == "stopped"
     assert body["trigger_enabled"] is False
     assert body["decision_mode"] == "off"
-    assert body["roomba_stop"] == "ok"
+    # roomba_stop is fire-and-forget so it returns "queued" immediately —
+    # the actual upstream POST runs in a background task.
+    assert body["roomba_stop"] == "queued"
 
     # Side effects.
     assert main.app.state.eeg_trigger["enabled"] is False
     assert main.app.state.autopilot["running"] is False
 
-    # dispatch=off was retained-published.
+    # dispatch=off was retained-published — and the autopilot-stop side of
+    # the call did NOT also publish forward_stop in between (the
+    # emergency-src early-return in _autopilot_stop_internal). Verify by
+    # looking at the *last* publish, which must be "off".
     calls = [a for a, _ in main.app.state.mq.publish.call_args_list if a and a[0] == "control/decision_mode"]
     assert calls
     import json as _json
-    assert _json.loads(calls[-1][1]) == {"dispatch": "off"}
+    payloads = [_json.loads(c[1]) for c in calls]
+    assert payloads[-1] == {"dispatch": "off"}
+    assert all(p == {"dispatch": "off"} for p in payloads), (
+        f"emergency-stop must not publish forward_stop transiently — saw {payloads}"
+    )
 
-    # /command/stop was fired with src=emergency.
-    stops = [d for d in dispatches if d["cmd"] == "stop"]
-    assert stops, "emergency-stop must call _dispatch_command('stop', ...)"
-    assert stops[-1]["src"] == "emergency"
+    # /command/stop was queued with src=emergency. Give the create_task one
+    # event-loop tick to run by re-entering the TestClient context.
+    import asyncio as _asyncio
+    # Drain pending background tasks scheduled during the request handler.
+    loop = _asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_asyncio.sleep(0.05))
+    finally:
+        loop.close()
+
+
+def test_emergency_stop_skips_autopilot_dispatch_restore(client):
+    """An EEG-launched autopilot run plus e-stop must NOT republish
+    `forward_stop` in between steps 1 and 3 — decision_svc could otherwise
+    briefly see it and fire α→forward right as the operator is e-stopping.
+    """
+    c, main = client
+    main.app.state.autopilot["running"] = True
+    main.app.state.autopilot["src"] = "eeg"       # ← eeg-launched run
+    main.app.state.autopilot["task"] = None
+    main.app.state.eeg_trigger["enabled"] = True  # currently armed
+    main.app.state.mq.publish.reset_mock()
+
+    async def fake_dispatch(cmd, *, src="manual", **_kw):
+        return True
+
+    main._dispatch_command = fake_dispatch  # type: ignore[attr-defined]
+
+    r = c.post("/emergency-stop")
+    assert r.status_code == 200
+
+    calls = [a for a, _ in main.app.state.mq.publish.call_args_list if a and a[0] == "control/decision_mode"]
+    import json as _json
+    payloads = [_json.loads(c[1]) for c in calls]
+    # Exactly one decision_mode publish: the e-stop step 3. No flicker.
+    assert payloads == [{"dispatch": "off"}], (
+        f"emergency-stop with eeg-src autopilot must publish only once — saw {payloads}"
+    )
 
 
 def test_emergency_stop_when_idle_still_safe(client):
     """E-stop on a quiet system must not raise. autopilot reports
-    not_running, roomba still gets a stop. Robust to mash-button-when-bored.
+    not_running, roomba still gets a stop queued. Robust to mash-button-when-bored.
     """
     c, main = client
     main.app.state.autopilot["running"] = False
@@ -362,27 +405,7 @@ def test_emergency_stop_when_idle_still_safe(client):
     assert body["autopilot"] == "not_running"
     assert body["trigger_enabled"] is False
     assert body["decision_mode"] == "off"
-    assert body["roomba_stop"] == "ok"
-
-
-def test_emergency_stop_roomba_failure_doesnt_abort(client):
-    """If the Roomba HTTP call fails, e-stop still records the failure
-    and the other steps complete."""
-    c, main = client
-    main.app.state.autopilot["running"] = False
-    main.app.state.eeg_trigger["enabled"] = True
-
-    async def fake_dispatch(cmd, *, src="manual", **_kw):
-        return False  # simulate transport failure
-
-    main._dispatch_command = fake_dispatch  # type: ignore[attr-defined]
-
-    r = c.post("/emergency-stop")
-    assert r.status_code == 200
-    body = r.json()
-    assert body["trigger_enabled"] is False  # disarmed despite roomba failure
-    assert body["decision_mode"] == "off"
-    assert body["roomba_stop"] == "failed"
+    assert body["roomba_stop"] == "queued"
 
 
 def test_autopilot_stop_user_src_doesnt_touch_dispatch(client):

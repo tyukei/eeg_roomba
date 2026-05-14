@@ -863,6 +863,13 @@ async def _autopilot_stop_internal(*, src: str = "user") -> dict[str, Any]:
     # Now that the run is done, restore the dispatch mode to match the *user's*
     # trigger preference — otherwise a one-shot test-fire would mute the legacy
     # α→forward path forever. Keep it `off` only when the trigger is armed.
+    #
+    # Skip this restore when e-stop is the caller: it sets its own
+    # `dispatch=off` retained publish unconditionally a few steps later, and
+    # we don't want a brief `forward_stop` flicker on the broker in between
+    # (decision_svc could otherwise see it and re-fire α→forward).
+    if src.startswith("emergency"):
+        return {"status": "stopped", "src": src}
     if prior_src and prior_src.startswith("eeg"):
         trig = app.state.eeg_trigger
         dispatch = "off" if trig.get("enabled") else "forward_stop"
@@ -1079,13 +1086,18 @@ async def emergency_stop() -> dict[str, Any]:
         log.exception("emergency-stop: decision_mode publish failed")
         out["decision_mode"] = f"error: {e}"
 
-    # 4) Final safety: send `stop` to the Roomba directly. The autopilot
+    # 4) Final safety: fire `stop` at the Roomba directly. The autopilot
     #    loop's own teardown also does this, but if the loop never started
     #    OR if the user pushed e-stop because of manual joystick weirdness,
-    #    this is the one call that's guaranteed to hit the wheels.
+    #    this is the one call that's guaranteed to hit the wheels. We
+    #    `create_task` rather than awaiting so the UI doesn't sit on a 2s
+    #    httpx timeout to pi-b — the actual stop signal is already on its
+    #    way via the MQTT publish at step 3 (which the autopilot loop and
+    #    decision_svc both consume), and the direct POST is belt-and-
+    #    suspenders.
     try:
-        ok = await _dispatch_command("stop", src="emergency")
-        out["roomba_stop"] = "ok" if ok else "failed"
+        asyncio.create_task(_dispatch_command("stop", src="emergency"))
+        out["roomba_stop"] = "queued"
     except Exception as e:  # noqa: BLE001
         log.exception("emergency-stop: roomba stop dispatch failed")
         out["roomba_stop"] = f"error: {e}"
