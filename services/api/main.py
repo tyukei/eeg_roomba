@@ -83,6 +83,11 @@ async def lifespan(app: FastAPI):
         targets = list(SUBS.get(msg.topic, ()))
         for ws in targets:
             asyncio.run_coroutine_threadsafe(_safe_send(ws, msg.topic, text), loop)
+        # Persist every roomba/cmd to TimescaleDB so the UI can rehydrate
+        # trajectory + autopilot timeline after a browser reload, and so we
+        # can JOIN with eeg_features for research queries.
+        if msg.topic == "roomba/cmd":
+            asyncio.run_coroutine_threadsafe(_record_roomba_event(text), loop)
 
     mq.on_message = _on_message
     mq.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
@@ -90,6 +95,14 @@ async def lifespan(app: FastAPI):
         mq.subscribe(topic, qos=0)
     mq.loop_start()
     app.state.mq = mq
+
+    # Rehydrate the autopilot decision timeline from DB so a fresh /autopilot/status
+    # poll after an api restart still shows the recent decisions. Bounded to
+    # AUTOPILOT_MAX_DECISIONS so the in-memory ring buffer stays small.
+    try:
+        await _hydrate_autopilot_decisions()
+    except Exception:  # noqa: BLE001 — never let a cold-start query break boot
+        log.exception("autopilot decision hydration failed")
 
     try:
         yield
@@ -123,6 +136,81 @@ async def _safe_send(ws: WebSocket, topic: str, payload: str) -> None:
         SUBS.get(topic, set()).discard(ws)
 
 
+async def _record_roomba_event(raw: str) -> None:
+    """Persist a `roomba/cmd` MQTT payload into the roomba_events hypertable.
+
+    Payload schema (all strings except `ok`/`ts`):
+        { ts, cmd, ok, src, reason?, mode?, goal?, model?, err? }
+
+    Silently drops malformed payloads so a misbehaving publisher can't
+    knock the MQTT fan-out off the rails. Bad payloads are logged.
+    """
+    try:
+        ev = json.loads(raw)
+    except json.JSONDecodeError:
+        log.warning("roomba/cmd payload is not JSON: %r", raw[:120])
+        return
+    cmd = ev.get("cmd")
+    src = ev.get("src", "manual")
+    ok = bool(ev.get("ok", False))
+    ts_epoch = ev.get("ts")
+    if not isinstance(cmd, str) or not isinstance(src, str):
+        return
+    try:
+        async with app.state.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO roomba_events (ts, cmd, ok, src, reason, mode, goal, model, err)
+                VALUES (to_timestamp($1), $2, $3, $4, $5, $6, $7, $8, $9)
+                """,
+                float(ts_epoch) if isinstance(ts_epoch, (int, float)) else time.time(),
+                cmd,
+                ok,
+                src,
+                ev.get("reason"),
+                ev.get("mode"),
+                ev.get("goal"),
+                ev.get("model"),
+                ev.get("err"),
+            )
+    except Exception:  # noqa: BLE001 — DB hiccups must not break MQTT fan-out
+        log.exception("roomba_events insert failed (cmd=%s src=%s)", cmd, src)
+
+
+async def _hydrate_autopilot_decisions() -> None:
+    """Pull recent autopilot rows from DB into the in-memory decision buffer.
+
+    Called once at lifespan startup so /autopilot/status returns the recent
+    timeline even right after an api restart (UI was reloading and losing
+    the run-trace before this).
+    """
+    q = """
+      SELECT ts, cmd, ok, reason
+      FROM roomba_events
+      WHERE src = 'autopilot'
+      ORDER BY ts DESC
+      LIMIT $1
+    """
+    async with app.state.pool.acquire() as conn:
+        rows = await conn.fetch(q, AUTOPILOT_MAX_DECISIONS)
+    # rows are newest-first; flip so the in-memory buffer stays oldest-first
+    # (matches the append-only convention the live loop writes).
+    decisions = [
+        {
+            "ts": r["ts"].timestamp(),
+            "command": r["cmd"],
+            "reason": r["reason"] or "",
+            "ok": bool(r["ok"]),
+        }
+        for r in reversed(rows)
+    ]
+    app.state.autopilot["decisions"] = decisions
+    if decisions:
+        latest = decisions[-1]
+        app.state.autopilot["last_command"] = latest["command"]
+        app.state.autopilot["last_reason"] = latest["reason"]
+
+
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
@@ -148,6 +236,39 @@ async def history_alpha(seconds: int = 60, ch: int | None = None) -> list[dict[s
     if ch is not None:
         out = [r for r in out if r["ch"] == ch]
     return out
+
+
+@app.get("/history/roomba")
+async def history_roomba(seconds: int = 600, src: str | None = None) -> list[dict[str, Any]]:
+    """Return roomba_events from the last `seconds` window.
+
+    Used by the UI on tab load to rehydrate the trajectory + chip strip +
+    autopilot timeline after a reload. Pass `src=autopilot` to filter to
+    just the Gemini-Robotics decisions.
+    """
+    q = """
+      SELECT ts, cmd, ok, src, reason, mode, goal, model, err
+      FROM roomba_events
+      WHERE ts > now() - ($1::int * INTERVAL '1 second')
+        AND ($2::text IS NULL OR src = $2)
+      ORDER BY ts ASC
+    """
+    async with app.state.pool.acquire() as conn:
+        rows = await conn.fetch(q, seconds, src)
+    return [
+        {
+            "ts": r["ts"].timestamp(),
+            "cmd": r["cmd"],
+            "ok": bool(r["ok"]),
+            "src": r["src"],
+            "reason": r["reason"],
+            "mode": r["mode"],
+            "goal": r["goal"],
+            "model": r["model"],
+            "err": r["err"],
+        }
+        for r in rows
+    ]
 
 
 @app.get("/history/bands")
@@ -219,11 +340,29 @@ async def serial_status() -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
-async def _dispatch_command(cmd: str, src: str = "manual") -> bool:
+async def _dispatch_command(
+    cmd: str,
+    src: str = "manual",
+    *,
+    reason: str | None = None,
+    mode: str | None = None,
+    goal: str | None = None,
+    model: str | None = None,
+) -> bool:
     """Background-task half of /control/{cmd}: hits roomba-api and reports.
 
     Returns True on success so callers (autopilot) can record the outcome.
+
+    Optional metadata (reason/mode/goal/model) is forwarded to MQTT and then
+    into roomba_events, so the autopilot trace is queryable after the fact
+    and can be JOINed with eeg_features.
     """
+    extra: dict[str, Any] = {}
+    if reason: extra["reason"] = reason
+    if mode:   extra["mode"]   = mode
+    if goal:   extra["goal"]   = goal
+    if model:  extra["model"]  = model
+
     try:
         r = await app.state.http.post(f"{ROOMBA_BASE}/command/{cmd}", timeout=2.0)
         r.raise_for_status()
@@ -231,13 +370,13 @@ async def _dispatch_command(cmd: str, src: str = "manual") -> bool:
         log.warning("roomba command %s failed: %s", cmd, e)
         app.state.mq.publish(
             "roomba/cmd",
-            json.dumps({"cmd": cmd, "ts": time.time(), "ok": False, "err": str(e), "src": src}),
+            json.dumps({"cmd": cmd, "ts": time.time(), "ok": False, "err": str(e), "src": src, **extra}),
             qos=1,
         )
         return False
     app.state.mq.publish(
         "roomba/cmd",
-        json.dumps({"cmd": cmd, "ts": time.time(), "ok": True, "src": src}),
+        json.dumps({"cmd": cmd, "ts": time.time(), "ok": True, "src": src, **extra}),
         qos=1,
     )
     return True
@@ -511,7 +650,14 @@ async def _autopilot_loop() -> None:
                     state["last_error"] = f"parse error: {text[:120]}"
                     _autopilot_log(state, "error", state["last_error"], False)
                 else:
-                    ok = await _dispatch_command(command, src="autopilot")
+                    ok = await _dispatch_command(
+                        command,
+                        src="autopilot",
+                        reason=reason,
+                        mode=cfg["mode"],
+                        goal=cfg["goal"] or None,
+                        model=model,
+                    )
                     state["last_command"] = command
                     state["last_reason"] = reason
                     state["last_error"] = None if ok else "dispatch failed"

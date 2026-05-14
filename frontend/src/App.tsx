@@ -103,6 +103,29 @@ export default function App() {
     fetch(`${API_BASE}/camera/start`, { method: "POST" }).catch(() => {});
   }, []);
 
+  // Rehydrate the trajectory + chip strip from DB on mount. WebSocket pushes
+  // for /roomba/cmd then keep extending the same array. Without this, a
+  // browser reload mid-run wipes the visible history even though the events
+  // are still in TimescaleDB.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/history/roomba?seconds=3600`);
+        if (!r.ok) return;
+        const rows: { ts: number; cmd: string; ok: boolean }[] = await r.json();
+        if (cancelled || rows.length === 0) return;
+        setTrajHistory((h) =>
+          // If WS already pushed something newer, keep that; otherwise seed.
+          h.length === 0 ? rows.map((r) => ({ ts: r.ts, cmd: r.cmd, ok: r.ok })) : h
+        );
+      } catch {
+        // transient — UI just starts empty, WS will fill in
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const setThresh = async (patch: Partial<Threshold>) => {
     const next = { ...s.threshold, ...patch };
     setS((p) => ({ ...p, threshold: next }));
