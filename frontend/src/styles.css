@@ -92,10 +92,12 @@ body {
 .side { display: flex; flex-direction: column; gap: 20px; }
 
 /* Roomba tab — camera, trajectory map, joystick all in one row.
-   Recent-commands table wraps to a full-width row below. */
+   Recent-commands table wraps to a full-width row below. The camera
+   and trajectory panels cap their visual height so a wide viewport
+   doesn't blow them up taller than the joystick column. */
 .roomba-wrap {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 320px;
   grid-template-areas:
     "cam  traj  ctrl"
     "cmds cmds  cmds";
@@ -106,6 +108,14 @@ body {
 .roomba-wrap > .traj-map-panel     { grid-area: traj; }
 .roomba-wrap > .side               { grid-area: ctrl; }
 .roomba-wrap > .panel:last-of-type { grid-area: cmds; }
+
+/* Constrain camera + trajectory heights so a 1920-wide viewport doesn't
+   blow them up taller than the joystick. The aspect-ratio rule on .cam-area
+   keeps the width proportional once height is capped. */
+.roomba-wrap .cam-area { max-height: 280px; max-width: 100%; aspect-ratio: 4 / 3; }
+.roomba-wrap .cam-area img { object-fit: contain; }
+.roomba-wrap .traj-canvas { display: flex; justify-content: center; }
+.roomba-wrap .traj-canvas svg { max-height: 280px; width: auto; max-width: 100%; }
 @media (max-width: 1400px) {
   .roomba-wrap {
     grid-template-columns: minmax(0, 1fr) 320px;
