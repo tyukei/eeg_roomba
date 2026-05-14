@@ -2,8 +2,10 @@
  * Heart rate estimated from EEG via the BCG (ballistocardiogram) artifact.
  *
  * EEG electrodes pick up a small pulse-synchronous signal from blood flow
- * through scalp arteries — usually visible on frontal channels. Bandpass
- * 0.7-3 Hz, peak-pick on the envelope, then BPM = 60 / mean RR.
+ * through the scalp — usually visible on frontal channels. We highpass at
+ * ~1 Hz (wide MA subtraction) to kill EEG drift, lightly smooth, then
+ * peak-pick with an adaptive threshold and an MBPM-derived refractory
+ * window. BPM = 60 / mean RR over the valid peaks.
  *
  * Caveat: this is an artifact, not ECG. The estimate is noisy and only
  * works well when the subject is still and the BCG is strong. Display
@@ -19,11 +21,13 @@ interface Props {
 }
 
 const CH_PRIMARY = 0;    // Fp1 — frontal, typically the cleanest BCG
-const CH_SECONDARY = 1;  // Fp2 — fallback if primary is bad
+const CH_SECONDARY = 1;  // Fp2 — fallback if primary is too short
 const MIN_BPM = 40;
 const MAX_BPM = 180;
+// MIN_PEAK_DIST sets the refractory window during peak picking (no two
+// peaks closer than this). RR intervals outside [60/MAX, 60/MIN] are
+// dropped at the BPM-aggregation step — no separate MAX_PEAK_DIST needed.
 const MIN_PEAK_DIST = Math.floor((60 / MAX_BPM) * LIVE_HZ);  // ≈ 16 samples @ 50Hz
-const MAX_PEAK_DIST = Math.ceil((60 / MIN_BPM) * LIVE_HZ);   // ≈ 75 samples @ 50Hz
 
 // Centered moving average — used for both DC removal (subtract a wide
 // window) and smoothing (subtract a narrow window). Simple and cheap.
@@ -57,13 +61,15 @@ function estimateBpm(signal: number[]): Estimate {
   if (n < LIVE_HZ * 4) {
     return { bpm: null, peaks: [], filtered: new Float32Array(n), confidence: "low" };
   }
-  // Bandpass ≈ 0.7–5 Hz: subtract wide MA (removes <1 Hz drift), then
-  // narrow MA smooths >5 Hz noise. Cheap zero-phase substitute for
-  // a Butterworth biquad.
-  const wide = movingAvg(signal, Math.floor(LIVE_HZ * 1.0));       // ~1 s window → cuts <1 Hz
+  // Cheap pseudo-bandpass: subtract a ~1 s moving average (highpass
+  // at ~1 Hz — kills EEG drift) then apply a 5-sample MA smoother
+  // (mild LPF, mostly to denoise the peak picker, not a true cutoff).
+  // Not a Butterworth — the BCG-pulse band is wide and irregular so a
+  // sharp filter would over-attenuate weak pulses.
+  const wide = movingAvg(signal, Math.floor(LIVE_HZ * 1.0));
   const detrended = new Float32Array(n);
   for (let i = 0; i < n; i++) detrended[i] = signal[i] - wide[i];
-  const smoothed = movingAvg(detrended, 5);                         // ~5 sample LPF
+  const smoothed = movingAvg(detrended, 5);
 
   // Adaptive threshold from the trailing window stdev.
   let sum = 0, sum2 = 0;
@@ -184,12 +190,12 @@ function HrSparkline({ filtered, peaks }:
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="hr-spark">
-      <path d={d} fill="none" stroke="var(--bad)" strokeWidth="1.2" />
+      <path d={d} fill="none" stroke="var(--accent)" strokeWidth="1.2" />
       {peaks
         .filter((p) => p >= start)
         .map((p) => (
           <circle key={p} cx={xOf(p)} cy={yOf(filtered[p])} r={2.2}
-                  fill="var(--bad)" />
+                  fill="var(--accent)" />
         ))}
     </svg>
   );

@@ -30,6 +30,13 @@ interface Props {
 const EPS = 1e-6;
 const FOCUS_MAX = 2; // β/(α+θ) tends to live in 0..~2
 
+// Hex equivalents of the CSS theme tokens — three.js does not read CSS
+// vars, so we mirror the palette here. Keep these in sync with
+// :root in styles.css.
+const C_ACCENT = "#7aa2f7";   // --accent — blue, used for "relax / α"
+const C_WARN   = "#d9b384";   // --warn   — amber, used for "focus / β"
+const C_MUTED  = "#a8acb5";   // --muted  — neutral grey, time axis
+
 function meanAtTime(grid: number[][], i: number): number {
   let s = 0, n = 0;
   for (let c = 0; c < NCH; c++) {
@@ -39,7 +46,8 @@ function meanAtTime(grid: number[][], i: number): number {
   return n ? s / n : 0;
 }
 
-function Trajectory({ bandsBuf, tick: _tick }: Props) {
+function Trajectory({ bandsBuf, tick: _tick, autoSpin }:
+                      Props & { autoSpin: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
 
   const data = useMemo(() => {
@@ -73,7 +81,7 @@ function Trajectory({ bandsBuf, tick: _tick }: Props) {
   }, [_tick]);
 
   useFrame((_state, dt) => {
-    if (groupRef.current) groupRef.current.rotation.y += dt * 0.15;
+    if (groupRef.current && autoSpin) groupRef.current.rotation.y += dt * 0.15;
   });
 
   if (!data) return null;
@@ -86,19 +94,20 @@ function Trajectory({ bandsBuf, tick: _tick }: Props) {
       {/* Floor grid in the focus-relax plane (y = -0.5) */}
       <gridHelper args={[1, 10, "#3a3f4a", "#2a2e36"]} position={[0, -0.5, 0]} />
 
-      {/* Axis frame edges */}
-      <AxisLine from={[-0.5, -0.5, -0.5]} to={[0.5, -0.5, -0.5]} color="#7aa2f7" />
-      <AxisLine from={[-0.5, -0.5, -0.5]} to={[-0.5, 0.5, -0.5]} color="#a8acb5" />
-      <AxisLine from={[-0.5, -0.5, -0.5]} to={[-0.5, -0.5, 0.5]} color="#d97757" />
+      {/* Axis frame edges. Color tokens mirror MindState's gauge colors so
+       *  the user can recognise focus/relax across the two panels. */}
+      <AxisLine from={[-0.5, -0.5, -0.5]} to={[0.5, -0.5, -0.5]} color={C_WARN} />
+      <AxisLine from={[-0.5, -0.5, -0.5]} to={[-0.5, 0.5, -0.5]} color={C_MUTED} />
+      <AxisLine from={[-0.5, -0.5, -0.5]} to={[-0.5, -0.5, 0.5]} color={C_ACCENT} />
 
       {/* Axis labels */}
-      <Text position={[0.55, -0.5, -0.5]} fontSize={0.07} color="#7aa2f7" anchorX="left">
+      <Text position={[0.55, -0.5, -0.5]} fontSize={0.07} color={C_WARN} anchorX="left">
         focus →
       </Text>
-      <Text position={[-0.5, 0.55, -0.5]} fontSize={0.07} color="#a8acb5" anchorX="left">
+      <Text position={[-0.5, 0.55, -0.5]} fontSize={0.07} color={C_MUTED} anchorX="left">
         time →
       </Text>
-      <Text position={[-0.5, -0.5, 0.55]} fontSize={0.07} color="#d97757" anchorX="left">
+      <Text position={[-0.5, -0.5, 0.55]} fontSize={0.07} color={C_ACCENT} anchorX="left">
         relax →
       </Text>
 
@@ -106,7 +115,7 @@ function Trajectory({ bandsBuf, tick: _tick }: Props) {
           disconnected from the floor */}
       <Line
         points={[[head[0], -0.5, head[2]], head]}
-        color="#a8acb5"
+        color={C_MUTED}
         lineWidth={1}
         dashed
         dashScale={20}
@@ -117,7 +126,6 @@ function Trajectory({ bandsBuf, tick: _tick }: Props) {
         points={data.points}
         vertexColors={data.colors}
         lineWidth={2.5}
-        transparent
       />
 
       {/* Head sphere — current state */}
@@ -144,6 +152,12 @@ function AxisLine({ from, to, color }:
 }
 
 export default function MindTrajectory3D({ bandsBuf, tick }: Props) {
+  // Respect the OS-level reduced-motion preference — the auto-spin can
+  // be vestibular-uncomfortable on a 320px canvas for some viewers.
+  // Default to spinning so the demo reads as "alive" out of the box.
+  const reducedMotion = typeof window !== "undefined"
+    && typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   return (
     <div className="mind3d-canvas">
       <Canvas
@@ -153,7 +167,7 @@ export default function MindTrajectory3D({ bandsBuf, tick }: Props) {
       >
         <ambientLight intensity={0.85} />
         <pointLight position={[2, 2, 2]} intensity={0.6} />
-        <Trajectory bandsBuf={bandsBuf} tick={tick} />
+        <Trajectory bandsBuf={bandsBuf} tick={tick} autoSpin={!reducedMotion} />
         <OrbitControls
           enablePan={false}
           enableZoom={false}

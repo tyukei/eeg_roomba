@@ -69,19 +69,20 @@ export function MindState({ state, bandsBuf, tick: _tick }: Props) {
   const focusNow = trailingMean(series.map((s) => s.focus), SMOOTH_N);
   const relaxNow = trailingMean(series.map((s) => s.relax), SMOOTH_N);
 
-  // 現在値（bandsNow も併用 — series が空のとき用フォールバック）
+  // Series が空のとき用フォールバック（起動直後の数秒）
   const aNow = meanCh(state.bandsNow.alpha);
   const bNow = meanCh(state.bandsNow.beta);
   const tNow = meanCh(state.bandsNow.theta);
   const focusDisp = series.length ? focusNow : focusOf(aNow, bNow, tNow);
   const relaxDisp = series.length ? relaxNow : relaxOf(aNow, bNow);
 
-  // 単一状態（composite score）— β と α の優劣で判定。
-  // (β - α) / (β + α) ∈ [-1, +1]、+0.15 以上で focused / -0.15 以下で relaxed。
-  const aFR = series.length ? trailingMean(series.map((s) => s.relax), SMOOTH_N) : relaxDisp;
-  // aFR は 0..1 の relax index なので、focused/relaxed は別計算でやる
-  const compositeFromBands = bNow + aNow > 0 ? (bNow - aNow) / (bNow + aNow) : 0;
-  const composite = compositeFromBands; // -1..+1
+  // 状態判定はゲージと同じ smoothed series から導出する — bandsNow を直接
+  // 使うとフレーム単位でフリッカしバッジとゲージが食い違って見える。
+  // composite = (focus - 2*relax) / (focus + 2*relax + ε) ∈ [-1, +1]、
+  //   focus は 0..2 想定なので relax(0..1) と等価に並べるために x2 する。
+  const cf = focusDisp;
+  const cr = relaxDisp * 2;
+  const composite = cf + cr > EPS ? (cf - cr) / (cf + cr) : 0;
   const status: "focused" | "relaxed" | "neutral" =
     composite > 0.15 ? "focused"
     : composite < -0.15 ? "relaxed"
@@ -93,12 +94,9 @@ export function MindState({ state, bandsBuf, tick: _tick }: Props) {
                    : status === "relaxed" ? "α > β: リラックス・α 優位"
                    : "α と β がほぼ拮抗";
 
-  // Focus を 0..1 に正規化して表示（実測 β/(α+θ) は 0..3 くらいの幅があるので 2 を上限に）
+  // β/(α+θ) は実測で 0..2 強の幅があるので 2.0 をフルスケールとして正規化。
   const focusPct = Math.max(0, Math.min(100, (focusDisp / 2) * 100));
   const relaxPct = Math.max(0, Math.min(100, relaxDisp * 100));
-
-  // suppress unused warning
-  void aFR;
 
   return (
     <div className={`mind-panel mind-${status}`}>
@@ -108,8 +106,8 @@ export function MindState({ state, bandsBuf, tick: _tick }: Props) {
           <span className="mind-status-hint">{statusHint}</span>
         </div>
         <div className="mind-gauges">
-          <Gauge label="Focus" sub="β / (α+θ)" pct={focusPct} raw={focusDisp} color="var(--warn)" />
-          <Gauge label="Relax" sub="α / (α+β)" pct={relaxPct} raw={relaxDisp} color="var(--accent)" />
+          <Gauge label="Focus" sub="β / (α+θ)" pct={focusPct} raw={focusDisp} max={2} color="var(--warn)" />
+          <Gauge label="Relax" sub="α / (α+β)" pct={relaxPct} raw={relaxDisp} max={1} color="var(--accent)" />
         </div>
       </div>
       <MindTimeline series={series} />
@@ -117,8 +115,8 @@ export function MindState({ state, bandsBuf, tick: _tick }: Props) {
   );
 }
 
-function Gauge({ label, sub, pct, raw, color }:
-                { label: string; sub: string; pct: number; raw: number; color: string }) {
+function Gauge({ label, sub, pct, raw, max, color }:
+                { label: string; sub: string; pct: number; raw: number; max: number; color: string }) {
   return (
     <div className="mind-gauge">
       <div className="mind-gauge-head">
@@ -130,6 +128,7 @@ function Gauge({ label, sub, pct, raw, color }:
       </div>
       <div className="mind-gauge-num" style={{ color }}>
         {raw.toFixed(2)}
+        <span className="mind-gauge-max"> / {max.toFixed(1)}</span>
       </div>
     </div>
   );
