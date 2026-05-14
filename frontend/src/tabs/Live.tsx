@@ -1,11 +1,7 @@
-import { useMemo } from "react";
-import uPlot from "uplot";
-
-import { AutoChart } from "../components/AutoChart";
+import { ChannelGrid } from "../components/ChannelGrid";
 import { Slider } from "../components/Slider";
 import { formatSI } from "../format";
-import { themeColors } from "../theme";
-import { NCH, LIVE_BUF_SEC, LIVE_HZ, AppState, Threshold } from "../types";
+import { AppState, Threshold } from "../types";
 
 export interface LiveTabProps {
   state: AppState;
@@ -15,49 +11,8 @@ export interface LiveTabProps {
 }
 
 export function Live({ state, liveBuf, tick, setThresh }: LiveTabProps) {
-  void tick; // dep only
-
   const buf = liveBuf.current;
-  const chartData = useMemo<uPlot.AlignedData>(() => {
-    return [
-      buf.ts.slice(),
-      ...buf.ch.map((c) => {
-        if (c.length === 0) return [];
-        let sum = 0;
-        for (const v of c) sum += v;
-        const mean = sum / c.length;
-        return c.map((v) => v - mean);
-      }),
-    ] as any;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buf.ts.length, buf.ts[buf.ts.length - 1]]);
-
   const selectedChs = state.threshold.channels;
-
-  const chartOpts = useMemo<Omit<uPlot.Options, "width">>(() => {
-    const c = themeColors();
-    return {
-      height: 300,
-      scales: { x: { time: true }, y: { auto: true } },
-      series: [{}, ...Array.from({ length: NCH }, (_, i) => ({
-        label: `ch${i}`,
-        stroke: selectedChs.includes(i)
-          ? c.accent
-          : `hsl(212 14% ${48 + (i / (NCH - 1)) * 30}%)`,
-        width: selectedChs.includes(i) ? 1.8 : 0.9,
-      }))],
-      axes: [
-        { stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border } },
-        {
-          stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border },
-          size: 60, space: 38,
-          values: (_u, splits) => splits.map((v) => formatSI(v)),
-        },
-      ],
-      legend: { show: false },
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChs.join(",")]);
 
   const curAlpha = selectedChs.length
     ? selectedChs.reduce((a, c) => a + (state.bandsNow.alpha[c] ?? 0), 0) / selectedChs.length
@@ -68,29 +23,25 @@ export function Live({ state, liveBuf, tick, setThresh }: LiveTabProps) {
   const alphaArr = state.bandsNow.alpha;
   const maxAlpha = Math.max(1, ...alphaArr);
 
-  void liveBuf; void LIVE_BUF_SEC; void LIVE_HZ;
-
   return (
     <div className="app">
       <div className="panel main-panel">
         <div className="panel-head">
           <h2>EEG live (16ch)</h2>
-          <small>10s window · ch mean removed for display</small>
+          <small>10s window · each ch auto-scaled · decision chs accented</small>
         </div>
-        <div className="chart">
-          {buf.ts.length === 0 ? (
-            <div className="chart-empty">
-              <div className="chart-empty-title">Waiting for PiEEG data…</div>
-              <small>
-                {state.pieegOnline
-                  ? "Acquirer is online · stream starting"
-                  : "WS connected — start pieeg.service on Pi-A to see the signal"}
-              </small>
-            </div>
-          ) : (
-            <AutoChart baseOpts={chartOpts} data={chartData} />
-          )}
-        </div>
+        {buf.ts.length === 0 ? (
+          <div className="chart-empty">
+            <div className="chart-empty-title">Waiting for PiEEG data…</div>
+            <small>
+              {state.pieegOnline
+                ? "Acquirer is online · stream starting"
+                : "WS connected — start pieeg.service on Pi-A to see the signal"}
+            </small>
+          </div>
+        ) : (
+          <ChannelGrid liveBuf={liveBuf} selected={selectedChs} tick={tick} />
+        )}
 
         <div className="panel-head" style={{ marginTop: 16 }}>
           <h2>α band power</h2>
