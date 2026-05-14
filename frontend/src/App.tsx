@@ -103,6 +103,30 @@ export default function App() {
     fetch(`${API_BASE}/camera/start`, { method: "POST" }).catch(() => {});
   }, []);
 
+  // Rehydrate the trajectory + chip strip from DB on mount. WebSocket pushes
+  // for roomba/cmd extend the same array in real time, so the merge here
+  // needs to be careful: if a WS event arrived between mount and this
+  // fetch resolving, the naive replace would clobber it; a naive bail
+  // (h.length>0 ? keep) would drop all pre-mount history. Merge by
+  // taking the DB seed plus any live events newer than its tail.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/history/roomba?seconds=3600`);
+        if (!r.ok) return;
+        const rows: { ts: number; cmd: string; ok: boolean }[] = await r.json();
+        if (cancelled || rows.length === 0) return;
+        const seedMax = rows[rows.length - 1].ts;
+        const seed: TrajectoryStep[] = rows.map((r) => ({ ts: r.ts, cmd: r.cmd, ok: r.ok }));
+        setTrajHistory((live) => [...seed, ...live.filter((e) => e.ts > seedMax)]);
+      } catch {
+        // transient — UI just starts empty, WS will fill in
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const setThresh = async (patch: Partial<Threshold>) => {
     const next = { ...s.threshold, ...patch };
     setS((p) => ({ ...p, threshold: next }));
