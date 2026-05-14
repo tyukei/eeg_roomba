@@ -82,40 +82,26 @@ export function ExpandablePanel({
   );
 
   if (expanded) {
-    return (
-      <>
-        <div
-          className={`panel ${className ?? ""}`}
-          style={style}
-          data-panel={dataPanel}
-        >
-          <div className="panel-head">
-            <h2>{title}</h2>
-            <div className="panel-head-right">
-              <small>(expanded — click × or press Esc to collapse)</small>
-            </div>
-          </div>
-          <div className="panel-stub">expanded</div>
+    // Drop the inline tile entirely while the overlay is up — the grid
+    // auto-fit reflow looks cleaner than leaving a "expanded" stub in the
+    // dashboard, and the modal already has its own close affordances.
+    return createPortal(
+      <div
+        className="expanded-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === "string" ? title : "Expanded panel"}
+        onClick={(e) => {
+          // Click outside the inner card collapses, like an image lightbox.
+          if (e.target === e.currentTarget) setExpanded(false);
+        }}
+      >
+        <div className={`panel expanded-card ${className ?? ""}`} data-panel={dataPanel}>
+          {head}
+          <div className="expanded-body">{children}</div>
         </div>
-        {createPortal(
-          <div
-            className="expanded-overlay"
-            role="dialog"
-            aria-modal="true"
-            aria-label={typeof title === "string" ? title : "Expanded panel"}
-            onClick={(e) => {
-              // Click outside the inner card collapses, like an image lightbox.
-              if (e.target === e.currentTarget) setExpanded(false);
-            }}
-          >
-            <div className={`panel expanded-card ${className ?? ""}`} data-panel={dataPanel}>
-              {head}
-              <div className="expanded-body">{children}</div>
-            </div>
-          </div>,
-          document.body,
-        )}
-      </>
+      </div>,
+      document.body,
     );
   }
 

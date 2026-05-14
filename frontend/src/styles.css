@@ -327,29 +327,43 @@ body {
   display: flex; align-items: center; gap: 8px;
   margin-left: auto;
 }
+/* Hover the whole tile → reveal it can be expanded. The button alone is too
+ * subtle to discover; lifting the border on hover advertises interactivity. */
+.panel.expandable { transition: border-color 0.1s, box-shadow 0.1s; }
+.panel.expandable:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.panel.expandable:hover .panel-expand-btn {
+  color: var(--accent);
+  border-color: var(--accent);
+}
 .panel-expand-btn {
   background: transparent;
   color: var(--muted);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0 6px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 22px;
-  cursor: pointer;
-  transition: color 0.1s, border-color 0.1s;
+  cursor: zoom-in;
+  transition: color 0.1s, border-color 0.1s, background 0.1s;
 }
 .panel-expand-btn:hover {
   color: var(--accent);
   border-color: var(--accent);
-}
-.panel-stub {
-  color: var(--muted);
-  font-size: 12px;
-  font-style: italic;
-  padding: 12px 0;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
-/* Fullscreen overlay for expanded panels — lightbox-style. */
+/* Fullscreen overlay for expanded panels — lightbox-style with a quick
+ * fade so the transition isn't jarring against the otherwise polished UI. */
+@keyframes estop-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes panel-pop-in {
+  from { transform: scale(0.97); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
 .expanded-overlay {
   position: fixed; inset: 0;
   background: color-mix(in srgb, var(--bg) 75%, #000 25% / 80%);
@@ -357,14 +371,31 @@ body {
   z-index: 1000;
   display: grid; place-items: center;
   padding: 32px;
+  animation: estop-fade-in 120ms ease-out;
 }
 .expanded-card {
   width: min(1200px, 96vw);
   max-height: 92vh;
   overflow: auto;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  animation: panel-pop-in 140ms ease-out;
 }
 .expanded-body { min-width: 0; }
+
+/* spanColumns clamp: at intermediate widths the auto-fit grid yields only
+ * 2 tracks, so a panel requesting `span 3` would overflow. Clamp every
+ * `grid-column: span N` to fit available tracks. */
+@media (max-width: 1024px) {
+  .analysis-wrap .panel[style*="span 3"] {
+    grid-column: 1 / -1 !important;
+  }
+}
+@media (max-width: 760px) {
+  .analysis-wrap .panel[style*="span 2"],
+  .analysis-wrap .panel[style*="span 3"] {
+    grid-column: 1 / -1 !important;
+  }
+}
 
 /* Sub-section inside a panel — replaces nested .panel */
 .panel-section + .panel-section {
@@ -651,6 +682,11 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
  * overlay's content area for a closer look. */
 .expanded-overlay .brain3d-canvas,
 .expanded-overlay .brain3d-loading { height: 60vh; }
+/* Compact mobile: a 240 px canvas eats half the viewport on phones. */
+@media (max-width: 720px) {
+  .brain3d-canvas,
+  .brain3d-loading { height: 180px; }
+}
 .brain3d-tip {
   position: absolute;
   bottom: 10px; left: 10px;
