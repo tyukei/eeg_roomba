@@ -15,12 +15,16 @@ import paho.mqtt.client as mqtt
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from google import genai
+from google.genai import types as gtypes
 
 log = logging.getLogger("api")
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 ROOMBA_BASE = os.environ.get("ROOMBA_HTTP_BASE", "http://localhost:8000").rstrip("/")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
 
 # Topic -> set of websockets to fan out to.
 SUBS: dict[str, set[WebSocket]] = {
@@ -46,6 +50,7 @@ async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     app.state.pool = await asyncpg.create_pool(_dsn(), min_size=1, max_size=4)
     app.state.http = httpx.AsyncClient()
+    app.state.genai = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
     loop = asyncio.get_running_loop()
     mq = mqtt.Client(client_id="api", protocol=mqtt.MQTTv311)
@@ -239,6 +244,77 @@ async def camera_stream():
 async def set_threshold(body: dict[str, Any]) -> dict[str, str]:
     app.state.mq.publish("control/threshold", json.dumps(body), qos=1, retain=True)
     return {"status": "queued"}
+
+
+SYSTEM_INSTRUCTION = (
+    "You are the operator assistant for eeg_roomba — a 3-node pipeline that "
+    "reads 16-channel EEG from a PiEEG, computes band power, and drives a "
+    "Roomba based on an alpha-power decision rule. You receive a JSON snapshot "
+    "of the live system state with each user message. Answer concisely and "
+    "factually about the data you can see; if the user asks about historical "
+    "trends you cannot observe from the snapshot, say so. Reply in the user's "
+    "language (Japanese or English). Band powers are in μV²-derived units."
+)
+
+
+CHAT_MAX_MESSAGES = 40
+CHAT_MAX_TEXT_BYTES = 4 * 1024
+CHAT_MAX_CONTEXT_BYTES = 4 * 1024
+# Whitelist of context keys we accept. Anything else is dropped before the
+# snapshot is inlined into the prompt.
+CHAT_CONTEXT_KEYS = {"pieegOnline", "roombaOk", "decisionState", "threshold", "bandsNow"}
+
+
+@app.post("/chat")
+async def chat(body: dict[str, Any]) -> dict[str, Any]:
+    """Multi-turn chat with a Gemini-backed assistant.
+
+    Body: { messages: [{role: "user"|"model", text: str}], context: {...} }
+    Returns: { text: str }
+    """
+    if app.state.genai is None:
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set on the api service")
+
+    msgs = body.get("messages") or []
+    if not isinstance(msgs, list) or not msgs:
+        raise HTTPException(status_code=400, detail="messages must be a non-empty array")
+    if len(msgs) > CHAT_MAX_MESSAGES:
+        msgs = msgs[-CHAT_MAX_MESSAGES:]
+
+    raw_context = body.get("context") or {}
+    context = {k: raw_context.get(k) for k in CHAT_CONTEXT_KEYS if k in raw_context}
+    snap = json.dumps(context, ensure_ascii=False, default=str)[:CHAT_MAX_CONTEXT_BYTES]
+
+    contents = []
+    for m in msgs:
+        role = "user" if m.get("role") == "user" else "model"
+        text = str(m.get("text", ""))[:CHAT_MAX_TEXT_BYTES]
+        if text:
+            contents.append(gtypes.Content(role=role, parts=[gtypes.Part(text=text)]))
+
+    if not contents:
+        raise HTTPException(status_code=400, detail="no non-empty messages")
+
+    # Inject the live state snapshot as a leading part on the latest user turn
+    # so the model always sees the freshest state, not whatever was true 10
+    # turns ago.
+    if contents[-1].role == "user":
+        contents[-1].parts.insert(0, gtypes.Part(text=f"[live snapshot] {snap}\n\n"))
+
+    try:
+        resp = await app.state.genai.aio.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=contents,
+            config=gtypes.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION,
+                temperature=0.4,
+            ),
+        )
+    except Exception:
+        log.exception("gemini call failed")
+        raise HTTPException(status_code=502, detail="upstream model call failed") from None
+
+    return {"text": resp.text or ""}
 
 
 @app.websocket("/ws")

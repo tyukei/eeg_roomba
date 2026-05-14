@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { ChatBubble } from "./components/ChatBubble";
 import { Analysis } from "./tabs/Analysis";
 import { Live } from "./tabs/Live";
 import { Trajectory } from "./tabs/Trajectory";
@@ -133,6 +134,8 @@ export default function App() {
         {tab === "analysis" && <Analysis state={s} liveBuf={liveBuf} bandsBuf={bandsBuf} tick={tick} />}
         {tab === "trajectory" && <Trajectory history={trajHistory} />}
       </main>
+
+      <ChatBubble state={s} apiBase={API_BASE} />
     </div>
   );
 }
