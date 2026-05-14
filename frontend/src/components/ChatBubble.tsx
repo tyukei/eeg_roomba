@@ -4,6 +4,27 @@ import { AppState } from "../types";
 
 type Msg = { role: "user" | "model"; text: string };
 
+const TEMPLATES: { label: string; q: string }[] = [
+  { label: "Topographyとは",
+    q: "pieegタブの Topography パネルの見方と何が読み取れるかを2-3行で教えて。" },
+  { label: "Band power 60s",
+    q: "Band power 60s グラフの軸の意味と読み方を2-3行で教えて。" },
+  { label: "PSD",
+    q: "PSD グラフは何を表していて、どう読めばいい？" },
+  { label: "Bands · ch",
+    q: "Bands パネル (δ/θ/α/β/γ) は何を意味する？単位は？" },
+  { label: "Per-channel bands",
+    q: "Per-channel bands ダッシュボードで何が分かる？" },
+  { label: "Channel correlation",
+    q: "Channel correlation matrix の見方は？±1 は何が同期している?" },
+  { label: "Cognitive metrics",
+    q: "Engagement, α/β ratio, Frontal α asymmetry の意味と使い分けは？" },
+  { label: "Threshold",
+    q: "Live tab の threshold (enter / exit / dwell) は Roomba 制御にどう関わる？" },
+  { label: "全体フロー",
+    q: "EEG → Roomba が動くまでのデータの流れを1段落で説明して。" },
+];
+
 interface Props {
   state: AppState;
   apiBase: string;
@@ -20,8 +41,8 @@ export function ChatBubble({ state, apiBase }: Props) {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length, busy]);
 
-  const send = async () => {
-    const text = input.trim();
+  const sendText = async (text: string) => {
+    text = text.trim();
     if (!text || busy) return;
     const next: Msg[] = [...messages, { role: "user", text }];
     setMessages(next);
@@ -52,6 +73,8 @@ export function ChatBubble({ state, apiBase }: Props) {
     }
   };
 
+  const send = () => sendText(input);
+
   return (
     <>
       <button className={`chat-fab ${open ? "open" : ""}`} onClick={() => setOpen((v) => !v)}
@@ -74,12 +97,18 @@ export function ChatBubble({ state, apiBase }: Props) {
           </div>
           <div className="chat-list" ref={listRef}>
             {messages.length === 0 && (
-              <div className="chat-hint">
-                {"Ask about the current state, e.g.\n"}
-                {"・「今のdecisionがidleなのは何で？」\n"}
-                {"・「どのチャネルがαが高い？」\n"}
-                {"・「thresholdって何を意味してる？」"}
-              </div>
+              <>
+                <div className="chat-hint">
+                  チップで各コンポーネントの見方を聞くか、自由に質問してください。
+                </div>
+                <div className="chat-templates">
+                  {TEMPLATES.map((t) => (
+                    <button key={t.label} className="chat-template-chip"
+                            onClick={() => sendText(t.q)}
+                            disabled={busy}>{t.label}</button>
+                  ))}
+                </div>
+              </>
             )}
             {messages.map((m, i) => (
               <div key={i} className={`chat-msg ${m.role}`}>

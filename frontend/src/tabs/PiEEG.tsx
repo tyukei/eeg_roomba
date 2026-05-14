@@ -138,7 +138,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
     <>
       <AnalyzePanel apiBase={apiBase} targetRef={wrapRef} />
       <div className="analysis-wrap" ref={wrapRef}>
-      <div className="panel" style={{ gridColumn: 1, gridRow: "span 2" }}>
+      <div className="panel" style={{ gridColumn: 1, gridRow: "span 2" }} data-panel="Topography">
         <div className="panel-head">
           <h2>Topography</h2>
           <label className="small-label">band:
@@ -170,7 +170,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         </div>
       </div>
 
-      <div className="panel" style={{ gridColumn: "2 / span 2", gridRow: 1 }}>
+      <div className="panel" style={{ gridColumn: "2 / span 2", gridRow: 1 }} data-panel="Band power 60s">
         <div className="panel-head">
           <h2>Band power · 60s</h2>
           <div className="row" style={{ gap: 8 }}>
@@ -190,7 +190,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         <div className="chart"><AutoChart baseOpts={bandsOpts} data={bandsData} /></div>
       </div>
 
-      <div className="panel" style={{ gridColumn: 2, gridRow: 2 }}>
+      <div className="panel" style={{ gridColumn: 2, gridRow: 2 }} data-panel="PSD">
         <div className="panel-head">
           <h2>PSD · ch{ch}</h2>
           <small>Welch · 10s · log y</small>
@@ -198,7 +198,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         <AutoChart baseOpts={psdOpts} data={psdData} />
       </div>
 
-      <div className="panel" style={{ gridColumn: 3, gridRow: 2 }}>
+      <div className="panel" style={{ gridColumn: 3, gridRow: 2 }} data-panel="Bands">
         <div className="panel-head"><h2>Bands · ch{ch}</h2></div>
         <div className="band-bars">
           {bandsHere.map((b) => (
@@ -214,7 +214,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         </div>
       </div>
 
-      <div className="panel full">
+      <div className="panel full" data-panel="EEG live">
         <div className="panel-head">
           <h2>EEG live (16ch)</h2>
           <small>10s window · each ch auto-scaled · decision chs accented</small>
@@ -222,7 +222,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         <ChannelGrid liveBuf={liveBuf} selected={state.threshold.channels} tick={tick} />
       </div>
 
-      <div className="panel full">
+      <div className="panel full" data-panel="Per-channel bands">
         <div className="panel-head">
           <h2>Per-channel bands</h2>
           <small>each ch normalised independently · δ θ α β γ from left</small>
@@ -232,7 +232,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
       </div>
 
       <div className="analysis-bottom">
-        <div className="panel">
+        <div className="panel" data-panel="Channel correlation">
           <div className="panel-head">
             <h2>Channel correlation · 10s</h2>
             <small>Pearson r · ±1 = synced</small>
@@ -240,7 +240,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
           <CorrelationMatrix matrix={corr} selected={state.threshold.channels} />
         </div>
 
-        <div className="panel">
+        <div className="panel" data-panel="Cognitive metrics">
           <div className="panel-head">
             <h2>Cognitive metrics</h2>
             <small>over decision chs {decisionChs.map((c) => `ch${c}`).join(", ")} · frontal asym uses F3/F4</small>

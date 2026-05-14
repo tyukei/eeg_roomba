@@ -163,6 +163,32 @@ body {
   border-radius: 6px;
   border-left: 3px solid var(--accent);
 }
+.analyze-evidence {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.analyze-evidence-cell {
+  margin: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  display: flex; flex-direction: column; gap: 4px;
+  overflow: hidden;
+}
+.analyze-evidence-cell img {
+  display: block;
+  width: 100%; height: auto;
+  border-radius: 4px;
+  background: var(--bg);
+}
+.analyze-evidence-cell figcaption {
+  font-size: 11px; color: var(--muted);
+  letter-spacing: .04em;
+  text-align: center;
+}
 
 /* Per-channel bands grid (pieeg tab) — 16 channels × 5 bands */
 .bands-grid {
@@ -685,8 +711,27 @@ small { color: var(--muted); }
 .chat-hint {
   color: var(--muted); font-size: 12px; padding: 12px;
   background: var(--surface-2); border-radius: 6px;
-  white-space: pre-line; line-height: 1.7;
+  line-height: 1.7;
 }
+.chat-templates {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.chat-template-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.chat-template-chip:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+.chat-template-chip:disabled { opacity: 0.55; cursor: not-allowed; }
 .chat-msg { display: flex; }
 .chat-msg.user { justify-content: flex-end; }
 .chat-msg-body {
