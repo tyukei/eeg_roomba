@@ -1,0 +1,11 @@
+[project]
+name = "roomba-controller"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pyserial",
+    "opencv-python",
+    "google-genai",
+]
