@@ -182,8 +182,9 @@ body {
   background:
     radial-gradient(circle at 50% 38%, #2c3548 0%, #1a1f2e 55%, #0c1018 100%);
   box-shadow:
-    inset 0 10px 22px rgba(0,0,0,0.6),
-    inset 0 -2px 4px rgba(255,255,255,0.04),
+    inset 0 -10px 22px rgba(0,0,0,0.55),     /* shadow at the far side */
+    inset 0 2px 0 rgba(255,255,255,0.08),    /* lit top rim */
+    inset 0 -2px 0 rgba(0,0,0,0.5),          /* darker bottom rim */
     0 14px 28px rgba(0,0,0,0.5),
     0 0 0 1px var(--border);
 }
@@ -202,16 +203,28 @@ body {
 }
 .joy-knob:hover { transform: scale(1.02); }
 .joy-knob.active, .joy-knob:active {
-  transform: translateY(3px) scale(0.97);
+  transform: translateY(1px) scale(0.98);
   background:
-    radial-gradient(circle at 50% 32%,
-      color-mix(in srgb, var(--bad) 80%, #4a5573) 0%,
-      color-mix(in srgb, var(--bad) 35%, #2a3142) 50%,
+    radial-gradient(circle at 50% 30%,
+      color-mix(in srgb, var(--bad) 60%, #4a5573) 0%,
+      color-mix(in srgb, var(--bad) 25%, #2a3142) 55%,
       #161a26 100%);
   box-shadow:
-    0 2px 5px rgba(0,0,0,0.6),
-    inset 0 3px 5px rgba(0,0,0,0.5);
+    0 4px 8px rgba(0,0,0,0.55),
+    inset 0 2px 3px rgba(255,255,255,0.18),
+    inset 0 -3px 6px rgba(0,0,0,0.42);
 }
+.joy-knob-glyph {
+  display: block;
+  font-size: 20px;
+  line-height: 1;
+  color: rgba(255,255,255,0.22);
+  text-shadow: 0 1px 0 rgba(0,0,0,0.5), 0 -1px 0 rgba(255,255,255,0.12);
+  letter-spacing: 0;
+  pointer-events: none;
+}
+.joy-knob.active .joy-knob-glyph,
+.joy-knob:active .joy-knob-glyph { color: rgba(255,255,255,0.6); }
 .joy-arrow {
   position: absolute;
   width: 44px; height: 44px;

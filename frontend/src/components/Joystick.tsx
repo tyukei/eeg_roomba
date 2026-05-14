@@ -41,7 +41,9 @@ export function Joystick({ onCmd }: { onCmd: (c: string) => Promise<void> | void
         <button type="button" className={`joy-arrow down ${active === "back" ? "active" : ""}`}
                 onClick={() => fire("back")} aria-label="back">↓</button>
         <button type="button" className={`joy-knob ${active === "stop" ? "active" : ""}`}
-                onClick={() => fire("stop")} aria-label="stop" title="stop (space)" />
+                onClick={() => fire("stop")} aria-label="stop" title="stop (space)">
+          <span className="joy-knob-glyph">■</span>
+        </button>
       </div>
     </div>
   );
