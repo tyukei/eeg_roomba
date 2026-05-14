@@ -148,6 +148,29 @@ mosquitto_sub -h <analysis-pc> -t 'pieeg/health' -v
 > ソースのスナップショットがある (`roomba.ino`, `roomba_api.py`, 配線・分圧
 > ドキュメント等)。新規 Pi-B 立て直しの場合はそちらの README を参照のこと。
 
+### 3.0 ハードウェア前提
+
+Pi-B の物理接続は次の通り:
+
+```
+Pi-B ──USB──▶ Arduino ──5V TTL──▶ Roomba (mini-DIN, ROI)
+```
+
+- **Arduino を挟む理由**: Roomba ROI は 5V TTL、Pi の UART は 3.3V でレベル不一致のため。詳細は [`DESIGN.md` §2.5](DESIGN.md#25-なぜ-pi-b-と-roomba-の間に-arduino-を挟むか) 参照。
+- Arduino は **USB ケーブルで Pi-B に常時接続** されている前提。Pi-B 側からは `/dev/ttyACM0` (機種により `/dev/ttyACM1` などにずれる場合あり) として見える。
+
+疎通確認:
+
+```bash
+ls -l /dev/ttyACM*
+# crw-rw---- 1 root dialout ... /dev/ttyACM0 が見えていればOK
+
+# Pi-B のユーザが dialout グループに入っていない場合は追加
+sudo usermod -aG dialout $USER && newgrp dialout
+```
+
+ROI の初期化や Drive コマンド送出は Arduino 側ファームウェアと、その上の既存 FastAPI が担当する。本リポジトリの `pi_b_roomba_addon/` はその FastAPI を HTTP で叩いて生死を MQTT に出すだけで、シリアルを直接触らない。
+
 ### 3.1 既存 FastAPI の稼働確認
 ```bash
 curl http://localhost:8000/   # 既存 API がレスポンスすること
@@ -230,6 +253,7 @@ curl -X POST http://<analysis-pc>:8080/control/0   # PCのAPI経由でRoomba前�
 | `pylsl` が PiEEG-16 を見つけない | LAN分断/ファイアウォール。`mosquitto_sub` で `pieeg/health` が見えるかまず確認。LSLは UDP multicast 必要 |
 | `ingest` でDB queue full | TimescaleDB が遅い。`docker compose logs timescaledb` 確認、SSD化、`max_connections` 上げる |
 | `decision_svc` で Roomba HTTP 502 | `.env` の `ROOMBA_HTTP_BASE` 誤り or Pi-B側 FastAPI 落ち |
+| Pi-B FastAPI が起動するが Roomba が動かない | `/dev/ttyACM0` が見えていない (USB抜け) or dialout グループ未参加。`ls -l /dev/ttyACM*` と `groups $USER` で確認 |
 | Pi-A で `OSError: SPI` | `raspi-config` で SPI 有効化忘れ、または別プロセスが SPI を占有 |
 | α power が常時 0 | フィルタで殺し過ぎ。`feature/main.py` の HP cutoff (1Hz) と LP (40Hz) を確認 |
 | `uv sync` が遅い (Pi) | `~/.cache/uv` をSSD/USB に移す、もしくは `UV_INDEX_STRATEGY=first-index` |

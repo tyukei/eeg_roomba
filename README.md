@@ -3,9 +3,11 @@
 PiEEG-16 で取得した16ch EEG から α 帯バンドパワーをリアルタイム計算し、しきい値超過で Roomba を駆動する3ノード構成のIoTパイプライン。
 
 ```
-Pi-A (PiEEG)  ──LSL──▶  PC ──HTTP──▶  Pi-B (Roomba)
-              ─MQTT─▶                ─MQTT─▶
+人間 ──▶ PiEEG-16 ──SPI──▶ Pi-A ──LSL──▶ PC ──HTTP──▶ Pi-B ──USB serial──▶ Arduino ──5V TTL/ROI──▶ Roomba
+                                  ─MQTT─▶            ─MQTT─▶
 ```
+
+Pi-B と Roomba の間に **Arduino** を挟んでいるのは、Roomba の Open Interface (ROI) シリアルが **5V TTL** であるのに対し Raspberry Pi の GPIO UART が **3.3V** で、直結するとレベル不一致になるため。Arduino (5V系) を USB シリアル (CDC) で Pi-B にぶら下げ、Arduino ↔ Roomba は 5V TTL 直結とすることで、追加の分圧抵抗やレベルシフタ IC を使わず安全に橋渡ししている。Arduino 上には ROI コマンドを送出する薄いファームウェアを置く。
 
 ## 構成
 
@@ -13,7 +15,8 @@ Pi-A (PiEEG)  ──LSL──▶  PC ──HTTP──▶  Pi-B (Roomba)
 |---|---|---|
 | Pi-A | EEG取得 | `pi_a_acquirer/acquirer.py` (SPI→LSL Outlet + MQTT health) |
 | PC | 解析・永続化・UI | `services/{ingest,feature,decision,api}` + TimescaleDB + Mosquitto + React |
-| Pi-B | Roomba制御 | 既存FastAPI + `pi_b_roomba_addon/` (MQTT state) |
+| Pi-B | Roomba制御 (上位) | 既存FastAPI + `pi_b_roomba_addon/` (MQTT state) |
+| Arduino | レベル変換 + ROIブリッジ | Pi-B に USB シリアル接続。3.3V ↔ 5V を吸収し、ROI コマンドを Roomba に送出 |
 
 ## bring-up
 
