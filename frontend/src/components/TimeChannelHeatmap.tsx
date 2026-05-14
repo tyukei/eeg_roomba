@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { viridis } from "../colormap";
 import { MONTAGE } from "../montage";
 import { BandName, NCH } from "../types";
 
@@ -18,14 +19,6 @@ interface Props {
 const TARGET_COLS = 120;   // cap horizontal resolution for cheap render
 const ROW_HEIGHT = 16;     // px per channel row
 const ROW_GAP = 0;         // 0 → reads as a contiguous spectrogram image
-
-function colorFor(norm: number): string {
-  const v = Math.max(0, Math.min(1, norm));
-  const hue = 212 - 187 * v;
-  const sat = 25 + 50 * v;
-  const light = 38 + 24 * v;
-  return `hsl(${hue} ${sat}% ${light}%)`;
-}
 
 /**
  * Time × channels heatmap for one band.
@@ -95,7 +88,7 @@ export function TimeChannelHeatmap({ bandsBuf, band, tick, hovered, onHover }: P
                 key={j}
                 className="tch-cell"
                 style={{
-                  background: colorFor(v / cells.gmax),
+                  background: viridis(v / cells.gmax),
                   flex: `0 0 ${100 / cells.cols}%`,
                 }}
               />

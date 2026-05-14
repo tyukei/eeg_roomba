@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 
+import { viridis } from "../colormap";
 import { MONTAGE } from "../montage";
 import { AppState, BAND_NAMES, BandName, NCH } from "../types";
 
@@ -7,18 +8,6 @@ interface Props {
   state: AppState;
   hovered: number | null;
   onHover: (ch: number | null) => void;
-}
-
-/** Smooth blue→green→amber ramp (low → high power). HSL keeps it
- *  monochrome-ish so it doesn't clash with the rest of the dashboard's
- *  palette. Lightness floors at 38% so empty cells don't visually
- *  disappear into the panel background. */
-function colorFor(norm: number): string {
-  const v = Math.max(0, Math.min(1, norm));
-  const hue = 212 - 187 * v;
-  const sat = 25 + 50 * v;
-  const light = 38 + 24 * v;
-  return `hsl(${hue} ${sat}% ${light}%)`;
 }
 
 /**
@@ -72,7 +61,7 @@ export function BandHeatmap({ state, hovered, onHover }: Props) {
                   <div
                     key={`${ch}-${b}`}
                     className={`bh-cell ${isHover ? "hovered" : ""}`}
-                    style={{ background: colorFor(norm) }}
+                    style={{ background: viridis(norm) }}
                     title={`ch${ch} ${b}: ${v.toFixed(2)}`}
                     onPointerEnter={() => onHover(ch)}
                     onPointerLeave={() => onHover(null)}
