@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import uPlot from "uplot";
 
+import { AnalyzePanel } from "../components/AnalyzePanel";
 import { AutoChart } from "../components/AutoChart";
 import { BandsGrid } from "../components/BandsGrid";
 import { BrainSvg } from "../components/BrainSvg";
@@ -30,9 +31,11 @@ export interface PiEEGTabProps {
   liveBuf: React.MutableRefObject<{ ts: number[]; ch: number[][] }>;
   bandsBuf: React.MutableRefObject<{ ts: number[]; bands: Record<BandName, number[][]> }>;
   tick: number;
+  apiBase: string;
 }
 
-export function PiEEG({ state, liveBuf, bandsBuf, tick }: PiEEGTabProps) {
+export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [ch, setCh] = useState(6);
   const [band, setBand] = useState<BandName>("alpha");
   const [scale, setScale] = useState<"linear" | "log">("log");
@@ -132,7 +135,9 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick }: PiEEGTabProps) {
     : NaN;
 
   return (
-    <div className="analysis-wrap">
+    <>
+      <AnalyzePanel apiBase={apiBase} targetRef={wrapRef} />
+      <div className="analysis-wrap" ref={wrapRef}>
       <div className="panel" style={{ gridColumn: 1, gridRow: "span 2" }}>
         <div className="panel-head">
           <h2>Topography</h2>
@@ -259,7 +264,8 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick }: PiEEGTabProps) {
                 hint={`mean over ${decisionChs.length} ch`} />
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

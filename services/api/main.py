@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import json
 import logging
 import os
@@ -275,6 +277,7 @@ SYSTEM_INSTRUCTION = (
 CHAT_MAX_MESSAGES = 40
 CHAT_MAX_TEXT_BYTES = 4 * 1024
 CHAT_MAX_CONTEXT_BYTES = 4 * 1024
+ANALYZE_MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MB after base64 decode
 # Whitelist of context keys we accept. Anything else is dropped before the
 # snapshot is inlined into the prompt.
 CHAT_CONTEXT_KEYS = {"pieegOnline", "roombaOk", "decisionState", "threshold", "bandsNow"}
@@ -327,6 +330,77 @@ async def chat(body: dict[str, Any]) -> dict[str, Any]:
         )
     except Exception:
         log.exception("gemini call failed")
+        raise HTTPException(status_code=502, detail="upstream model call failed") from None
+
+    return {"text": resp.text or ""}
+
+
+ANALYZE_INSTRUCTION = (
+    "You are looking at a screenshot of the pieeg analysis tab from eeg_roomba — "
+    "a live EEG dashboard. The tab contains these panels: EEG live (16-channel "
+    "sparklines), Topography (electrode map coloured by band power), Band power "
+    "60s (time-series of δ θ α β γ for one selected channel), PSD (Welch spectrum), "
+    "Bands (current power of each band for the selected channel), Per-channel "
+    "bands (16 mini bar groups), Channel correlation (16×16 Pearson matrix), "
+    "Cognitive metrics (Engagement / α-β ratio / Frontal α asymmetry). "
+    "In ONE Japanese sentence (max 80 chars), describe the current brain state "
+    "visible in the screenshot. Then on a new line, write `根拠: ` followed by "
+    "the panel name(s) you read it from (comma separated). Keep it tight."
+)
+
+
+@app.post("/analyze-eeg")
+async def analyze_eeg(body: dict[str, Any]) -> dict[str, Any]:
+    """One-shot multimodal analysis of a screenshot of the pieeg tab.
+
+    Body: { image: "data:image/png;base64,..." | "<base64>", mime?: "image/png" }
+    Returns: { text: str }
+    """
+    if app.state.genai is None:
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set on the api service")
+
+    img = body.get("image")
+    if not isinstance(img, str) or not img:
+        raise HTTPException(status_code=400, detail="image (base64) required")
+
+    mime = body.get("mime") or "image/png"
+    # Strip optional data-URL prefix.
+    if img.startswith("data:"):
+        try:
+            head, img = img.split(",", 1)
+            if ";base64" in head and ":" in head:
+                mime = head.split(":", 1)[1].split(";", 1)[0] or mime
+        except ValueError:
+            raise HTTPException(status_code=400, detail="malformed data URL") from None
+
+    try:
+        raw = base64.b64decode(img, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status_code=400, detail="image is not valid base64") from None
+    if len(raw) > ANALYZE_MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail=f"image > {ANALYZE_MAX_IMAGE_BYTES} bytes")
+
+    contents = [
+        gtypes.Content(
+            role="user",
+            parts=[
+                gtypes.Part(inline_data=gtypes.Blob(mime_type=mime, data=raw)),
+                gtypes.Part(text="この pieeg ダッシュボードの今の脳波状態を一言で説明してください。"),
+            ],
+        ),
+    ]
+
+    try:
+        resp = await app.state.genai.aio.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=contents,
+            config=gtypes.GenerateContentConfig(
+                system_instruction=ANALYZE_INSTRUCTION,
+                temperature=0.3,
+            ),
+        )
+    except Exception:
+        log.exception("gemini analyze call failed")
         raise HTTPException(status_code=502, detail="upstream model call failed") from None
 
     return {"text": resp.text or ""}

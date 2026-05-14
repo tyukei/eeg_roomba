@@ -145,6 +145,25 @@ body {
   }
 }
 
+/* AI insight panel on the pieeg tab — sits above the analytics grid */
+.analyze-panel { margin-bottom: 20px; }
+.analyze-hint, .analyze-err, .analyze-result {
+  font-size: 13px; line-height: 1.55; white-space: pre-wrap;
+}
+.analyze-hint { color: var(--muted); }
+.analyze-err {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+  padding: 8px 12px; border-radius: 6px;
+}
+.analyze-result {
+  color: var(--text);
+  background: var(--surface-2);
+  padding: 10px 14px;
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+}
+
 /* Per-channel bands grid (pieeg tab) — 16 channels × 5 bands */
 .bands-grid {
   display: grid;

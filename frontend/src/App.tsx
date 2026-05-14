@@ -148,7 +148,9 @@ export default function App() {
         {tab === "live" && (
           <Live state={s} liveBuf={liveBuf} tick={tick} setThresh={setThresh} />
         )}
-        {tab === "pieeg" && <PiEEG state={s} liveBuf={liveBuf} bandsBuf={bandsBuf} tick={tick} />}
+        {tab === "pieeg" && (
+          <PiEEG state={s} liveBuf={liveBuf} bandsBuf={bandsBuf} tick={tick} apiBase={API_BASE} />
+        )}
         {tab === "roomba" && (
           <Roomba state={s} history={trajHistory} apiBase={API_BASE}
                   camOn={camOn} setCamOn={setCamOn} />
