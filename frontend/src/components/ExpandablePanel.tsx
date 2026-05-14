@@ -11,9 +11,10 @@ interface Props {
   dataPanel?: string;
   /** Optional extra class names applied to the outer `.panel`. */
   className?: string;
-  /** Inline grid hint — e.g. "span 2" to give a panel double width in the
-   *  responsive auto-fit grid. */
-  spanColumns?: number;
+  /** Make this panel span the full dashboard width — used for panels that
+   *  need the horizontal real estate (EEG 16ch grid, time-series heatmaps).
+   *  Maps to `column-span: all` in the CSS multi-column layout. */
+  wide?: boolean;
   children: ReactNode;
 }
 
@@ -35,7 +36,7 @@ export function ExpandablePanel({
   headExtras,
   dataPanel,
   className,
-  spanColumns,
+  wide,
   children,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
@@ -56,8 +57,7 @@ export function ExpandablePanel({
     };
   }, [expanded]);
 
-  const style: React.CSSProperties | undefined =
-    spanColumns && spanColumns > 1 ? { gridColumn: `span ${spanColumns}` } : undefined;
+  const wideCls = wide ? "panel-wide" : "";
 
   const head = (
     <div className="panel-head">
@@ -107,8 +107,7 @@ export function ExpandablePanel({
 
   return (
     <div
-      className={`panel expandable ${className ?? ""}`}
-      style={style}
+      className={`panel expandable ${wideCls} ${className ?? ""}`}
       data-panel={dataPanel}
     >
       {head}

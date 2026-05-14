@@ -236,7 +236,6 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         <ExpandablePanel
           title="Band power · 60s"
           dataPanel="Band power 60s"
-          spanColumns={2}
           headExtras={(
             <div className="row" style={{ gap: 8 }}>
               <label className="small-label">ch:
@@ -268,7 +267,6 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
           title="Cognitive metrics"
           subtitle={`decision chs ${decisionChs.map((c) => `ch${c}`).join(", ")} · frontal asym F3/F4`}
           dataPanel="Cognitive metrics"
-          spanColumns={2}
         >
           <div className="cog-grid">
             <Stat label="Engagement"
@@ -304,7 +302,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
           title={<>Time × Channel · {band}</>}
           subtitle="60s history · newest on the right"
           dataPanel="Time × Channel heatmap"
-          spanColumns={2}
+          wide
         >
           <TimeChannelHeatmap
             bandsBuf={bandsBuf}
@@ -327,7 +325,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
           title="EEG live (16ch)"
           subtitle="10s window · hover to highlight"
           dataPanel="EEG live"
-          spanColumns={2}
+          wide
         >
           <ChannelGrid
             liveBuf={liveBuf}
@@ -342,7 +340,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
           title="Per-channel bands"
           subtitle="δ θ α β γ from left · each ch normalised"
           dataPanel="Per-channel bands"
-          spanColumns={3}
+          wide
         >
           <BandsGrid
             state={state}
