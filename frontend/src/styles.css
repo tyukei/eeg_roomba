@@ -256,15 +256,30 @@ body {
 
 /* Live tab — big demo-friendly decision indicator at the top */
 .decision-hero {
+  position: relative;
   display: grid; grid-template-columns: max-content 1fr;
   grid-template-rows: auto auto;
   align-items: center;
   column-gap: 18px;
-  padding: 18px 22px;
+  padding: 18px 22px 18px 26px;
   border-radius: 10px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   transition: background .25s, border-color .25s, box-shadow .25s;
+}
+/* Idle resting indicator — a thin accent rail on the left so the panel
+   reads as "armed, waiting" rather than "off". Overridden by the
+   .decision-active glow below. */
+.decision-hero::before {
+  content: "";
+  position: absolute; left: 8px; top: 18px; bottom: 18px;
+  width: 3px; border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 45%, var(--border));
+  transition: background .25s, box-shadow .25s;
+}
+.decision-hero.decision-active::before {
+  background: var(--ok);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ok) 70%, transparent);
 }
 .decision-hero-label {
   grid-column: 1; grid-row: 1;
