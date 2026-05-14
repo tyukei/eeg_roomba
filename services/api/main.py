@@ -179,24 +179,39 @@ async def serial_status() -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
-@app.post("/control/{cmd}")
-async def proxy_control(cmd: str) -> dict[str, Any]:
+async def _dispatch_command(cmd: str) -> None:
+    """Background-task half of /control/{cmd}: hits roomba-api and reports."""
     try:
         r = await app.state.http.post(f"{ROOMBA_BASE}/command/{cmd}", timeout=2.0)
         r.raise_for_status()
     except httpx.HTTPError as e:
+        log.warning("roomba command %s failed: %s", cmd, e)
         app.state.mq.publish(
             "roomba/cmd",
             json.dumps({"cmd": cmd, "ts": time.time(), "ok": False, "err": str(e), "src": "manual"}),
             qos=1,
         )
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        return
     app.state.mq.publish(
         "roomba/cmd",
         json.dumps({"cmd": cmd, "ts": time.time(), "ok": True, "src": "manual"}),
         qos=1,
     )
-    return {"ok": True, "cmd": cmd}
+
+
+@app.post("/control/{cmd}")
+async def proxy_control(cmd: str) -> dict[str, Any]:
+    """Dispatch a manual Roomba command without blocking on Pi-B.
+
+    The roomba-api on pi-b does a ser.write + 100ms time.sleep to capture
+    the Arduino response, so each upstream call roundtrips ~135ms even on
+    localhost. Joystick repeat (~280ms) stacked with that latency makes
+    manual control feel sluggish. Fire the upstream call into the
+    background and ack immediately; the actual outcome is published to
+    `roomba/cmd` from `_dispatch_command` once known.
+    """
+    asyncio.create_task(_dispatch_command(cmd))
+    return {"ok": True, "cmd": cmd, "queued": True}
 
 
 @app.post("/camera/start")

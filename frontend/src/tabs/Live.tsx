@@ -65,8 +65,12 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChs.join(",")]);
 
-  const cmd = async (c: string) => {
-    await fetch(`${apiBase}/control/${c}`, { method: "POST" });
+  const cmd = (c: string) => {
+    // Fire-and-forget. Joystick UX is sensitive to round-trip latency and
+    // pi-b's roomba-api blocks ~100ms on every Arduino response. The API
+    // acks immediately and publishes the actual outcome to MQTT, so
+    // Trajectory still records success/failure asynchronously.
+    fetch(`${apiBase}/control/${c}`, { method: "POST" }).catch(() => {});
   };
 
   const curAlpha = selectedChs.length
