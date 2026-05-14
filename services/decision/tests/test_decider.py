@@ -126,3 +126,27 @@ def test_invalid_channel_index_is_skipped() -> None:
     d.on_alpha({"alpha": [3.0]})  # ch0=3, ch99 missing
     # Mean over kept channels = 3 < enter, no transition.
     assert d.state == "idle"
+
+
+def test_update_decision_mode_off_then_back() -> None:
+    """control/decision_mode toggles dispatch_mode but ignores junk values."""
+    d = _make()
+    assert d.dispatch_mode == "forward_stop"
+    d.update_decision_mode({"dispatch": "off"})
+    assert d.dispatch_mode == "off"
+    d.update_decision_mode({"dispatch": "garbage"})  # ignored
+    assert d.dispatch_mode == "off"
+    d.update_decision_mode({"dispatch": "forward_stop"})
+    assert d.dispatch_mode == "forward_stop"
+
+
+def test_dispatch_off_skips_http_call() -> None:
+    """When the EEG-trigger owns the robot, decision must NOT hit roomba-api."""
+    async def _run() -> None:
+        d = _make()
+        d.dispatch_mode = "off"
+        await d._dispatch("active")
+        d.http.post.assert_not_called()
+        d.mq.publish.assert_not_called()
+
+    asyncio.run(_run())

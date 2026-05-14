@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { AutopilotPanel } from "../components/AutopilotPanel";
+import { EegTriggerPanel } from "../components/EegTriggerPanel";
 import { Joystick } from "../components/Joystick";
 import { AppState, TrajectoryStep } from "../types";
 
@@ -151,6 +152,8 @@ export function Roomba({ state, history, apiBase, camOn, setCamOn }: RoombaTabPr
         </div>
         <Joystick onCmd={cmd} />
       </div>
+
+      <EegTriggerPanel apiBase={apiBase} decisionState={state.decisionState} />
 
       <AutopilotPanel apiBase={apiBase} layout="horizontal" />
 

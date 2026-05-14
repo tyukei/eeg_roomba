@@ -75,6 +75,19 @@ async def lifespan(app: FastAPI):
         # claim the loop or both leave a dangling task.
         "lock": asyncio.Lock(),
     }
+    # EEG-triggered autopilot: when enabled, the api flips autopilot on/off as
+    # the decision_svc's α-power hysteresis (`control/state`) transitions
+    # idle↔active, so a sustained α surge launches a goal-mode navigation run
+    # (default: human-leg seek) and the user doesn't have to click start.
+    app.state.eeg_trigger = {
+        "enabled": False,
+        "goal": "人間の足元 (human leg)",
+        "mode": "goal",
+        "interval": 3.0,
+        "model": GEMINI_ROBOTICS_MODEL,
+        "last_state": "idle",
+        "last_transition_ts": None,
+    }
 
     loop = asyncio.get_running_loop()
     mq = mqtt.Client(client_id="api", protocol=mqtt.MQTTv311)
@@ -89,6 +102,11 @@ async def lifespan(app: FastAPI):
         # can JOIN with eeg_features for research queries.
         if msg.topic == "roomba/cmd":
             asyncio.run_coroutine_threadsafe(_record_roomba_event(text), loop)
+        # control/state idle↔active is the alpha-trigger signal. The MQTT
+        # callback runs in paho's thread, so hop into the event loop before
+        # touching autopilot state or kicking off the /start coroutine.
+        if msg.topic == "control/state":
+            asyncio.run_coroutine_threadsafe(_handle_decision_state(text), loop)
 
     mq.on_message = _on_message
     mq.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
@@ -96,6 +114,16 @@ async def lifespan(app: FastAPI):
         mq.subscribe(topic, qos=0)
     mq.loop_start()
     app.state.mq = mq
+
+    # Default decision_svc dispatch mode = "forward_stop" (its legacy direct
+    # forward/stop behaviour). Publishing it retained means a freshly booted
+    # decision_svc picks up the latest desired mode without a UI round-trip.
+    mq.publish(
+        "control/decision_mode",
+        json.dumps({"dispatch": "forward_stop"}),
+        qos=1,
+        retain=True,
+    )
 
     # Rehydrate the autopilot decision timeline from DB so a fresh /autopilot/status
     # poll after an api restart still shows the recent decisions. Bounded to
@@ -140,6 +168,39 @@ async def _safe_send(ws: WebSocket, topic: str, payload: str) -> None:
         await ws.send_text(json.dumps({"topic": topic, "payload": payload}))
     except Exception:
         SUBS.get(topic, set()).discard(ws)
+
+
+async def _handle_decision_state(raw: str) -> None:
+    """React to a `control/state` MQTT payload (decision_svc's α hysteresis).
+
+    When the EEG-trigger feature is enabled, an idle→active edge launches the
+    goal-mode autopilot; an active→idle edge stops it. We ignore non-edges so
+    a retained republish on reconnect doesn't toggle the robot.
+    """
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return
+    state = payload.get("state")
+    if state not in ("idle", "active"):
+        return
+    trig = app.state.eeg_trigger
+    prev = trig.get("last_state", "idle")
+    trig["last_state"] = state
+    if prev == state:
+        return
+    trig["last_transition_ts"] = time.time()
+    if not trig.get("enabled"):
+        return
+    if state == "active":
+        await _autopilot_start_internal({
+            "interval": trig["interval"],
+            "mode": trig["mode"],
+            "goal": trig["goal"],
+            "model": trig["model"],
+        }, src="eeg")
+    else:  # active -> idle
+        await _autopilot_stop_internal(src="eeg")
 
 
 async def _record_roomba_event(raw: str) -> None:
@@ -694,13 +755,18 @@ async def _autopilot_loop() -> None:
         await _dispatch_command("stop", src="autopilot")
 
 
-@app.post("/autopilot/start")
-async def autopilot_start(body: dict[str, Any] | None = None) -> dict[str, Any]:
+async def _autopilot_start_internal(
+    body: dict[str, Any], *, src: str = "user"
+) -> dict[str, Any]:
+    """Shared start path used by both the REST endpoint and the EEG trigger.
+
+    `src` is logged so a stopped→started transition driven by the alpha-power
+    hysteresis is distinguishable from a manual UI click in the logs.
+    """
     if app.state.genai is None:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set on the api service")
     ap = app.state.autopilot
 
-    body = body or {}
     try:
         interval = float(body.get("interval", ap["config"]["interval"]))
     except (TypeError, ValueError):
@@ -712,18 +778,13 @@ async def autopilot_start(body: dict[str, Any] | None = None) -> dict[str, Any]:
     goal = str(body.get("goal") or "")[:200]
     model = str(body.get("model") or GEMINI_ROBOTICS_MODEL)[:80]
 
-    # Lock-guard: two concurrent /autopilot/start POSTs both pass the
-    # `running` check before either flips it, so without the lock both
-    # would launch a loop and the second would orphan the first task.
     async with ap["lock"]:
         if ap["running"]:
             return {"status": "already_running", "config": ap["config"]}
 
-        # Make sure the camera is actually streaming — autopilot needs frames.
         try:
             await app.state.http.post(f"{ROOMBA_BASE}/camera/start", timeout=5.0)
         except httpx.HTTPError:
-            # Non-fatal: the loop will surface a "no camera frame" error if needed.
             pass
 
         ap["config"] = {"interval": interval, "mode": mode, "goal": goal, "model": model}
@@ -733,22 +794,18 @@ async def autopilot_start(body: dict[str, Any] | None = None) -> dict[str, Any]:
         ap["decisions"] = []
         ap["running"] = True
         ap["task"] = asyncio.create_task(_autopilot_loop())
-        return {"status": "started", "config": ap["config"]}
+        log.info("autopilot started (src=%s mode=%s goal=%r)", src, mode, goal)
+        return {"status": "started", "config": ap["config"], "src": src}
 
 
-@app.post("/autopilot/stop")
-async def autopilot_stop() -> dict[str, Any]:
+async def _autopilot_stop_internal(*, src: str = "user") -> dict[str, Any]:
     ap = app.state.autopilot
     async with ap["lock"]:
         if not ap["running"]:
             return {"status": "not_running"}
         ap["running"] = False
         task = ap.get("task")
-    # The await happens outside the lock so /status calls don't queue behind
-    # a slow Gemini iteration cooling down.
     if task and not task.done():
-        # Prefer cooperative exit; the loop checks ap["running"] each tick
-        # and its finally sends one last "stop". Cancel only if it's stuck.
         try:
             await asyncio.wait_for(task, timeout=5.0)
         except asyncio.TimeoutError:
@@ -760,7 +817,23 @@ async def autopilot_stop() -> dict[str, Any]:
         except asyncio.CancelledError:
             pass
     ap["task"] = None
-    return {"status": "stopped"}
+    log.info("autopilot stopped (src=%s)", src)
+    return {"status": "stopped", "src": src}
+
+
+@app.post("/autopilot/start")
+async def autopilot_start(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    # Lock-guard: two concurrent /autopilot/start POSTs both pass the
+    # `running` check before either flips it, so without the lock both
+    # would launch a loop and the second would orphan the first task.
+    return await _autopilot_start_internal(body or {}, src="user")
+
+
+@app.post("/autopilot/stop")
+async def autopilot_stop() -> dict[str, Any]:
+    # The await happens outside the lock so /status calls don't queue behind
+    # a slow Gemini iteration cooling down.
+    return await _autopilot_stop_internal(src="user")
 
 
 @app.get("/autopilot/status")
@@ -775,6 +848,88 @@ async def autopilot_status() -> dict[str, Any]:
         "decisions": ap["decisions"],
         "model_available": app.state.genai is not None,
     }
+
+
+def _eeg_trigger_view() -> dict[str, Any]:
+    trig = app.state.eeg_trigger
+    return {
+        "enabled": bool(trig["enabled"]),
+        "goal": trig["goal"],
+        "mode": trig["mode"],
+        "interval": float(trig["interval"]),
+        "model": trig["model"],
+        "last_state": trig.get("last_state", "idle"),
+        "last_transition_ts": trig.get("last_transition_ts"),
+        "model_available": app.state.genai is not None,
+    }
+
+
+@app.get("/eeg-trigger")
+async def eeg_trigger_status() -> dict[str, Any]:
+    return _eeg_trigger_view()
+
+
+@app.post("/eeg-trigger")
+async def eeg_trigger_update(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Update the EEG-driven autopilot trigger.
+
+    Body fields (all optional, only provided ones are written):
+        enabled: bool   — master switch
+        goal:    str    — natural-language goal handed to Gemini Robotics
+        mode:    "goal" | "free"
+        interval: float (seconds, 1–30)
+        model:   str    — Gemini Robotics model id
+
+    Side effects:
+      • Republishes `control/decision_mode` retained so decision_svc knows
+        whether to keep dispatching forward/stop directly (legacy behaviour)
+        or stand down and let the EEG trigger orchestrate autopilot.
+      • If the trigger is disabled while autopilot was started *by* the
+        trigger, stop it — leaving a Gemini loop running unattended after
+        the user toggled the feature off would be surprising.
+    """
+    body = body or {}
+    trig = app.state.eeg_trigger
+    was_enabled = bool(trig["enabled"])
+
+    if "enabled" in body:
+        trig["enabled"] = bool(body["enabled"])
+    if "goal" in body:
+        trig["goal"] = str(body["goal"] or "")[:200]
+    if "mode" in body:
+        mode = body["mode"]
+        if mode not in ("free", "goal"):
+            raise HTTPException(status_code=400, detail="mode must be 'free' or 'goal'")
+        trig["mode"] = mode
+    if "interval" in body:
+        try:
+            iv = float(body["interval"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="interval must be a number") from None
+        trig["interval"] = max(1.0, min(30.0, iv))
+    if "model" in body:
+        trig["model"] = str(body["model"] or GEMINI_ROBOTICS_MODEL)[:80]
+
+    # Tell decision_svc whether to dispatch directly (default behaviour) or to
+    # stay quiet so the EEG trigger owns the robot. Retained so a freshly
+    # started decision_svc immediately picks up the right mode.
+    dispatch = "off" if trig["enabled"] else "forward_stop"
+    try:
+        app.state.mq.publish(
+            "control/decision_mode",
+            json.dumps({"dispatch": dispatch}),
+            qos=1,
+            retain=True,
+        )
+    except Exception:  # noqa: BLE001 — MQTT hiccup mustn't drop the REST call
+        log.exception("control/decision_mode publish failed")
+
+    # If we just turned the feature OFF, make sure we don't leave a robot
+    # roaming on a goal that the user no longer wants.
+    if was_enabled and not trig["enabled"] and app.state.autopilot["running"]:
+        await _autopilot_stop_internal(src="eeg-disable")
+
+    return _eeg_trigger_view()
 
 
 SYSTEM_INSTRUCTION = (

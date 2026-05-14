@@ -31,8 +31,16 @@ def client(monkeypatch):
         # AsyncMock so .close() returns an awaitable.
         return AsyncMock()
     monkeypatch.setattr(asyncpg, "create_pool", _fake_pool)
-    # AsyncClient is constructed sync but its methods (aclose, post, …) are awaited.
-    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **kw: AsyncMock())
+    # google.genai imports `class AsyncHttpxClient(httpx.AsyncClient)` at
+    # module load, so the replacement has to *be a class*. Subclassing the
+    # real AsyncClient gives us that for free, then we override the methods
+    # main actually awaits (post, aclose) with AsyncMocks.
+    class _StubAsyncClient(httpx.AsyncClient):
+        def __init__(self, *_a, **_kw):
+            super().__init__()
+            self.post = AsyncMock(return_value=MagicMock(status_code=200, raise_for_status=lambda: None))
+            self.aclose = AsyncMock()
+    monkeypatch.setattr(httpx, "AsyncClient", _StubAsyncClient)
     monkeypatch.setattr(mqtt_mod, "Client", MagicMock)
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
