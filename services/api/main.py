@@ -350,10 +350,16 @@ AUTOPILOT_PROMPT_GOAL = (
 async def _grab_jpeg_frame() -> bytes | None:
     """Pull one JPEG frame out of pi-b's MJPEG stream.
 
-    The roomba-api on pi-b serves `multipart/x-mixed-replace; boundary=frame`,
-    so we read chunks until we have one complete `Content-Length` part, then
-    close the stream. Returns None on any failure — callers should treat it
-    as a transient and try again on the next tick.
+    pi-b's roomba-api emits `multipart/x-mixed-replace; boundary=frame`
+    parts that carry only `Content-Type: image/jpeg` — *no* `Content-Length`.
+    Rather than fight the multipart framing, we just scan the raw byte stream
+    for the JPEG **Start-Of-Image** marker `\\xff\\xd8` and the matching
+    **End-Of-Image** `\\xff\\xd9`, and slice the complete frame out. This is
+    robust to whatever the upstream's boundary formatting happens to be, and
+    self-validating (we only return bytes that begin and end with the magic).
+
+    Returns None on any failure — callers should treat it as transient and
+    try again on the next tick.
     """
     try:
         req = app.state.http.build_request(
@@ -368,32 +374,26 @@ async def _grab_jpeg_frame() -> bytes | None:
         return None
 
     buf = bytearray()
+    soi_at = -1
 
     async def _read_one() -> bytes | None:
+        nonlocal soi_at
         async for chunk in upstream.aiter_raw():
             buf.extend(chunk)
             if len(buf) > AUTOPILOT_FRAME_MAX_BYTES * 2:
                 return None
-            # Need at least one full header section before we can parse a length.
-            header_end = buf.find(b"\r\n\r\n")
-            if header_end < 0:
+            if soi_at < 0:
+                soi_at = buf.find(b"\xff\xd8")
+                if soi_at < 0:
+                    # Drain pre-amble until we see a JPEG start.
+                    if len(buf) > 4096:
+                        del buf[:-1]
+                    continue
+            # Look for the matching EOI strictly after the SOI.
+            eoi_at = buf.find(b"\xff\xd9", soi_at + 2)
+            if eoi_at < 0:
                 continue
-            header = bytes(buf[:header_end])
-            length = None
-            for line in header.split(b"\r\n"):
-                low = line.lower()
-                if low.startswith(b"content-length:"):
-                    try:
-                        length = int(line.split(b":", 1)[1].strip())
-                    except (ValueError, IndexError):
-                        return None
-                    break
-            if length is None or length <= 0 or length > AUTOPILOT_FRAME_MAX_BYTES:
-                return None
-            body_start = header_end + 4
-            if len(buf) < body_start + length:
-                continue
-            return bytes(buf[body_start : body_start + length])
+            return bytes(buf[soi_at : eoi_at + 2])
         return None
 
     try:
