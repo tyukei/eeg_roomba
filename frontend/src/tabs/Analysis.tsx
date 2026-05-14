@@ -5,7 +5,9 @@ import uPlot from "uplot";
 import { BrainSvg } from "../components/BrainSvg";
 import { CorrelationMatrix } from "../components/CorrelationMatrix";
 import { corrMatrix, welch } from "../fft";
+import { formatSI } from "../format";
 import { MONTAGE } from "../montage";
+import { themeColors } from "../theme";
 import {
   AppState, BAND_COLORS, BAND_NAMES, BAND_RANGES, BandName,
   LIVE_HZ, NCH,
@@ -36,19 +38,26 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bb.ts.length, bb.ts[bb.ts.length - 1], ch]);
 
-  const bandsOpts = useMemo<uPlot.Options>(() => ({
-    width: 900, height: 220,
-    scales: { x: { time: true }, y: { auto: true, distr: scale === "log" ? 3 : 1 } },
-    series: [
-      {},
-      ...BAND_NAMES.map((b) => ({ label: b, stroke: BAND_COLORS[b], width: 1.5 })),
-    ],
-    axes: [
-      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" } },
-      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" }, size: 110 },
-    ],
-    legend: { show: false },
-  }), [scale]);
+  const bandsOpts = useMemo<uPlot.Options>(() => {
+    const c = themeColors();
+    return {
+      width: 900, height: 220,
+      scales: { x: { time: true }, y: { auto: true, distr: scale === "log" ? 3 : 1 } },
+      series: [
+        {},
+        ...BAND_NAMES.map((b) => ({ label: b, stroke: BAND_COLORS[b], width: 1.5 })),
+      ],
+      axes: [
+        { stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border } },
+        {
+          stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border },
+          size: 70,
+          values: (_u, splits) => splits.map((v) => formatSI(v)),
+        },
+      ],
+      legend: { show: false },
+    };
+  }, [scale]);
 
   const psdData = useMemo<uPlot.AlignedData>(() => {
     const samples = lb.ch[ch];
@@ -58,19 +67,26 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lb.ts.length, ch]);
 
-  const psdOpts = useMemo<uPlot.Options>(() => ({
-    width: 500, height: 200,
-    scales: { x: { time: false }, y: { auto: true, distr: 3 } },
-    series: [
-      { label: "f (Hz)" },
-      { label: "PSD (μV²/Hz)", stroke: "var(--accent)", width: 1.5 },
-    ],
-    axes: [
-      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" }, size: 36 },
-      { stroke: "var(--muted)", grid: { stroke: "var(--border)", width: 1 }, ticks: { stroke: "var(--border)" }, size: 90 },
-    ],
-    legend: { show: false },
-  }), []);
+  const psdOpts = useMemo<uPlot.Options>(() => {
+    const c = themeColors();
+    return {
+      width: 500, height: 200,
+      scales: { x: { time: false }, y: { auto: true, distr: 3 } },
+      series: [
+        { label: "f (Hz)" },
+        { label: "PSD (μV²/Hz)", stroke: c.accent, width: 1.5 },
+      ],
+      axes: [
+        { stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border }, size: 36 },
+        {
+          stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border },
+          size: 58,
+          values: (_u, splits) => splits.map((v) => formatSI(v)),
+        },
+      ],
+      legend: { show: false },
+    };
+  }, []);
 
   const corr = useMemo(() => {
     const chs = lb.ch;
@@ -110,7 +126,7 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
                   <td><strong>ch{e.ch}</strong></td>
                   <td>{e.name}</td>
                   <td><span className="region-chip">{e.region}</span></td>
-                  <td>{(topoValues[e.ch] ?? 0).toFixed(2)}</td>
+                  <td>{formatSI(topoValues[e.ch] ?? 0)}</td>
                 </tr>
               ))}
             </tbody>
@@ -118,7 +134,7 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
         </div>
       </div>
 
-      <div className="panel" style={{ gridColumn: "2 / -1", gridRow: 1 }}>
+      <div className="panel" style={{ gridColumn: "2 / span 2", gridRow: 1 }}>
         <div className="panel-head">
           <h2>Band power · 60s</h2>
           <div className="row" style={{ gap: 8 }}>
@@ -157,14 +173,14 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
               <div className="band-bar-label">
                 <strong>{b.band}</strong>
                 <small>{BAND_RANGES[b.band][0]}-{BAND_RANGES[b.band][1]}Hz</small>
-                <span>{b.value.toFixed(2)}</span>
+                <span>{formatSI(b.value)}</span>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="panel full">
+      <div className="panel corr-panel">
         <div className="panel-head">
           <h2>Channel correlation · 10s</h2>
           <small>Pearson r · ±1 = synced</small>

@@ -346,8 +346,14 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 
 /* Analysis tab — 3-column grid */
 .analysis-wrap {
+  /* col 4 must stay >= 460 so the 16x16 correlation SVG renders at
+     its intrinsic 414px without shrinking labels below readability. */
   display: grid;
-  grid-template-columns: 360px minmax(0, 1fr) 320px;
+  grid-template-columns:
+    minmax(280px, 340px)
+    minmax(0, 1fr)
+    minmax(180px, 220px)
+    minmax(460px, 500px);
   grid-auto-rows: min-content;
   gap: 20px;
 }
@@ -355,6 +361,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .analysis-wrap .chart { width: 100%; height: 220px; }
 .analysis-wrap .electrode-table-wrap {
   max-height: 220px; overflow: auto;
+}
+.analysis-wrap .panel.corr-panel {
+  grid-column: 4; grid-row: 1 / span 2;
+  align-self: stretch;
 }
 
 .band-bars {
