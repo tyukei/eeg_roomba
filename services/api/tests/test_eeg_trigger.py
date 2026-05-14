@@ -253,6 +253,40 @@ def test_disable_stops_only_eeg_started_autopilot(client):
     assert stopped == []
 
 
+def test_test_fire_starts_autopilot_with_trigger_config(client):
+    """POST /eeg-trigger/test-fire should kick off the autopilot using the
+    stored trigger config and stamp the run with src='eeg'."""
+    c, main = client
+    main.app.state.eeg_trigger["goal"] = "the red couch"
+    main.app.state.eeg_trigger["mode"] = "goal"
+    main.app.state.eeg_trigger["interval"] = 4.0
+    main.app.state.eeg_trigger["model"] = "gemini-robotics-er-1.6-preview"
+
+    started: list[dict] = []
+
+    async def fake_start(body, *, src):
+        started.append({"body": body, "src": src})
+        return {"status": "started", "config": body, "src": src}
+
+    main._autopilot_start_internal = fake_start  # type: ignore[attr-defined]
+    main.app.state.mq.publish.reset_mock()
+
+    r = c.post("/eeg-trigger/test-fire")
+    assert r.status_code == 200
+
+    assert started, "test-fire should have called _autopilot_start_internal"
+    assert started[0]["src"] == "eeg"
+    body = started[0]["body"]
+    assert body["goal"] == "the red couch"
+    assert body["mode"] == "goal"
+    assert body["interval"] == pytest.approx(4.0)
+
+    # dispatch=off was published so decision_svc stops dispatching during the test.
+    calls = [a for a, _ in main.app.state.mq.publish.call_args_list if a and a[0] == "control/decision_mode"]
+    assert calls, "test-fire must republish control/decision_mode"
+    assert json.loads(calls[-1][1]) == {"dispatch": "off"}
+
+
 def test_disable_stops_eeg_started_autopilot(client):
     """When the trigger started the run, disabling must stop it."""
     _, main = client

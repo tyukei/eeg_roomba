@@ -972,6 +972,44 @@ async def eeg_trigger_update(body: dict[str, Any] | None = None) -> dict[str, An
     return _eeg_trigger_view()
 
 
+@app.post("/eeg-trigger/test-fire")
+async def eeg_trigger_test_fire() -> dict[str, Any]:
+    """Manually fire the autopilot as if the α-power threshold had crossed.
+
+    Lets the operator dry-run the goal-mode behaviour without sitting in a
+    chair waiting for their occipital α to actually spike. Uses the current
+    `eeg_trigger` config (goal/mode/interval/model) and stamps the run with
+    `src="eeg"` so the existing OFF-to-stop path also tears it down.
+
+    Side effect: publishes `control/decision_mode=off` even if the trigger
+    isn't armed, so a legacy α→forward burst from decision_svc can't fight
+    the test run. The retained mode is restored to `forward_stop` only when
+    the user explicitly disables the trigger via `/eeg-trigger`.
+    """
+    trig = app.state.eeg_trigger
+    # Suppress decision_svc's direct dispatch for the duration of the test.
+    # If trigger is already armed, this is a no-op republish (idempotent).
+    try:
+        app.state.mq.publish(
+            "control/decision_mode",
+            json.dumps({"dispatch": "off"}),
+            qos=1,
+            retain=True,
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("control/decision_mode publish failed")
+
+    return await _autopilot_start_internal(
+        {
+            "interval": trig["interval"],
+            "mode": trig["mode"],
+            "goal": trig["goal"],
+            "model": trig["model"],
+        },
+        src="eeg",
+    )
+
+
 SYSTEM_INSTRUCTION = (
     "You are the operator assistant for eeg_roomba — a 3-node pipeline that "
     "reads 16-channel EEG from a PiEEG, computes band power, and drives a "
