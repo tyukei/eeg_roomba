@@ -82,19 +82,56 @@ body {
 
 .content { padding: 20px 24px; }
 
-/* Reusable app grid (used by Live tab) */
+/* Live tab — 2-col main + side */
 .app {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
-  grid-template-areas:
-    "main side"
-    "cam  side";
   gap: 20px;
   align-items: start;
 }
-.main-panel { grid-area: main; }
-.cam-panel { grid-area: cam; }
-.side { grid-area: side; display: flex; flex-direction: column; gap: 20px; }
+.side { display: flex; flex-direction: column; gap: 20px; }
+
+/* Roomba tab — camera dominates the left, control side on the right,
+   trajectory + recent commands wrap underneath. */
+.roomba-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-areas:
+    "cam   ctrl"
+    "traj  cmds";
+  gap: 20px;
+  align-items: start;
+}
+.roomba-wrap > .cam-panel       { grid-area: cam; }
+.roomba-wrap > .side            { grid-area: ctrl; }
+.roomba-wrap > .traj-map-panel  { grid-area: traj; }
+.roomba-wrap > .panel:last-of-type { grid-area: cmds; }
+@media (max-width: 1200px) {
+  .roomba-wrap { grid-template-columns: 1fr; grid-template-areas: "cam" "ctrl" "traj" "cmds"; }
+}
+
+/* Cognitive metrics panel on the pieeg tab */
+.cog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.cog-stat {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.cog-stat-label {
+  font-size: 11px; color: var(--muted);
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.cog-stat-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px; color: var(--text);
+}
+.cog-stat-hint { font-size: 10.5px; color: var(--muted); line-height: 1.4; }
 
 .panel {
   background: var(--surface);

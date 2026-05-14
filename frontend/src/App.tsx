@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ChatBubble } from "./components/ChatBubble";
-import { Analysis } from "./tabs/Analysis";
 import { Live } from "./tabs/Live";
-import { Trajectory } from "./tabs/Trajectory";
+import { PiEEG } from "./tabs/PiEEG";
+import { Roomba } from "./tabs/Roomba";
 import { useWebSocket } from "./ws";
 import {
   AppState, BAND_NAMES, BandName, BANDS_BUF_SEC, BANDS_HZ,
@@ -12,7 +12,7 @@ import {
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
 
-type Tab = "live" | "analysis" | "trajectory";
+type Tab = "live" | "pieeg" | "roomba";
 
 const emptyBands = (): Record<BandName, number[]> =>
   Object.fromEntries(BAND_NAMES.map((b) => [b, Array(NCH).fill(0)])) as any;
@@ -121,7 +121,7 @@ export default function App() {
           <strong>eeg_roomba</strong>
         </div>
         <nav className="tabs">
-          {(["live", "analysis", "trajectory"] as const).map((t) => (
+          {(["live", "pieeg", "roomba"] as const).map((t) => (
             <button key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
               {t}
             </button>
@@ -135,11 +135,13 @@ export default function App() {
 
       <main className="content">
         {tab === "live" && (
-          <Live state={s} liveBuf={liveBuf} tick={tick} apiBase={API_BASE}
-                setThresh={setThresh} camOn={camOn} setCamOn={setCamOn} />
+          <Live state={s} liveBuf={liveBuf} tick={tick} setThresh={setThresh} />
         )}
-        {tab === "analysis" && <Analysis state={s} liveBuf={liveBuf} bandsBuf={bandsBuf} tick={tick} />}
-        {tab === "trajectory" && <Trajectory history={trajHistory} />}
+        {tab === "pieeg" && <PiEEG state={s} liveBuf={liveBuf} bandsBuf={bandsBuf} tick={tick} />}
+        {tab === "roomba" && (
+          <Roomba state={s} history={trajHistory} apiBase={API_BASE}
+                  camOn={camOn} setCamOn={setCamOn} />
+        )}
       </main>
 
       <ChatBubble state={s} apiBase={API_BASE} />
