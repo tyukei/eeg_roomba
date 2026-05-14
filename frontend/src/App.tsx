@@ -127,6 +127,17 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <div className="header-status">
+          <HeaderPill label="PiEEG"
+                      cls={s.pieegOnline ? "ok" : "bad"}
+                      text={s.pieegOnline ? "online" : "offline"} />
+          <HeaderPill label="Decision"
+                      cls={s.decisionState}
+                      text={s.decisionState} />
+          <HeaderPill label="Roomba"
+                      cls={s.roombaOk ? "ok" : "bad"}
+                      text={s.roombaOk ? "online" : "offline"} />
+        </div>
         <div className="ws-badge">
           <span className={`ws-dot ${wsStatus}`} />
           <small>ws: {wsStatus}</small>
@@ -146,5 +157,14 @@ export default function App() {
 
       <ChatBubble state={s} apiBase={API_BASE} />
     </div>
+  );
+}
+
+function HeaderPill({ label, cls, text }: { label: string; cls: string; text: string }) {
+  return (
+    <span className="header-pill">
+      <span className="header-pill-label">{label}</span>
+      <span className={`pill ${cls}`}>{text}</span>
+    </span>
   );
 }
