@@ -66,6 +66,8 @@ export function Roomba({ state, history, apiBase, camOn, setCamOn }: RoombaTabPr
   const cy = -(minY - 20);
   const last = path[path.length - 1];
   const lastCmds = history.slice(-12).reverse();
+  const lastEventTs = history[history.length - 1]?.ts ?? 0;
+  const lastEventAgoSec = lastEventTs ? Math.max(0, Date.now() / 1000 - lastEventTs) : null;
 
   return (
     <div className="roomba-wrap compact">
@@ -107,7 +109,12 @@ export function Roomba({ state, history, apiBase, camOn, setCamOn }: RoombaTabPr
       <div className="panel traj-map-panel">
         <div className="panel-head">
           <h2>Trajectory</h2>
-          <small>{history.length} events</small>
+          <small>
+            {history.length} events
+            {lastEventAgoSec !== null && (
+              <> · {lastEventAgoSec < 2 ? "now" : `${Math.floor(lastEventAgoSec)}s ago`}</>
+            )}
+          </small>
         </div>
         <div className="traj-canvas">
           <svg viewBox={`0 0 ${w} ${h}`} width="100%"

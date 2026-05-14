@@ -47,6 +47,10 @@ export function AutopilotPanel({ apiBase, layout = "vertical" }: AutopilotPanelP
   const [model, setModel] = useState(MODELS[0]);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Which row in the timeline is expanded to show its full reason.
+  // Keyed by decision timestamp so reordering (new arrivals at the top)
+  // doesn't yank the expansion to the wrong row.
+  const [expandedTs, setExpandedTs] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -213,21 +217,33 @@ export function AutopilotPanel({ apiBase, layout = "vertical" }: AutopilotPanelP
         )}
 
         {decisionCards.length > 0 && (
-          <div className="autopilot-decisions" aria-label="recent autopilot decisions">
-            {decisionCards.map((d, i) => (
-              <div key={`${d.ts}-${i}`} className={`autopilot-decision ${d.ok ? "" : "bad"}`}>
-                <div className="autopilot-decision-head">
-                  <span className="autopilot-decision-ts">
-                    {new Date(d.ts * 1000).toLocaleTimeString()}
-                  </span>
-                  <span className={`cmd-tag ${d.ok ? "" : "bad"}`}>{d.command}</span>
-                </div>
-                <div className="autopilot-decision-reason">
-                  {d.reason || (d.ok ? "" : "(error)")}
-                </div>
-              </div>
-            ))}
-          </div>
+          <ol className="autopilot-timeline" aria-label="autopilot decision history">
+            {decisionCards.map((d) => {
+              const isExpanded = expandedTs === d.ts;
+              return (
+                <li
+                  key={d.ts}
+                  className={`autopilot-timeline-row ${isExpanded ? "expanded" : ""} ${d.ok ? "" : "bad"}`}
+                  onClick={() => setExpandedTs(isExpanded ? null : d.ts)}
+                >
+                  <span className={`autopilot-timeline-dot cmd-${d.command}`} aria-hidden="true" />
+                  <div className="autopilot-timeline-body">
+                    <div className="autopilot-timeline-head">
+                      <span className="autopilot-timeline-ts">
+                        {new Date(d.ts * 1000).toLocaleTimeString()}
+                      </span>
+                      <span className={`cmd-tag ${d.ok ? "" : "bad"}`}>{d.command}</span>
+                    </div>
+                    {d.reason ? (
+                      <div className="autopilot-timeline-reason">{d.reason}</div>
+                    ) : !d.ok ? (
+                      <div className="autopilot-timeline-reason">(error)</div>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         )}
       </div>
     );

@@ -744,39 +744,86 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   padding: 4px 8px;
 }
 
-/* Decision history — horizontal-scrolling card row, newest first. Each card
- * shows ts + cmd + full reason (no ellipsis on the reason; the card itself
- * caps its height with internal vertical scroll so an unusually long reason
- * doesn't push the rest of the page around). */
-.autopilot-decisions {
-  display: flex; gap: 8px;
-  margin-top: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-.autopilot-decision {
-  flex: 0 0 260px;
-  background: var(--surface-2);
-  border-radius: 6px;
-  border-left: 2px solid var(--accent);
-  padding: 6px 10px;
-  max-height: 120px;
+/* Decision history — vertical timeline, newest at top (VSCode git-graph
+ * style). Each row collapses the reason to one line; clicking expands it.
+ * Container caps height with internal y-scroll so the panel never grows
+ * the page. Dots are colored per cmd type so the time-series is
+ * scan-readable. */
+.autopilot-timeline {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-height: 240px;
   overflow-y: auto;
-  display: flex; flex-direction: column; gap: 4px;
+  position: relative;
 }
-.autopilot-decision.bad {
-  border-left-color: var(--bad);
+.autopilot-timeline-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  padding: 6px 8px 6px 2px;
+  cursor: pointer;
+  border-radius: 4px;
+  position: relative;
 }
-.autopilot-decision-head {
-  display: flex; align-items: center; gap: 6px;
+.autopilot-timeline-row:hover {
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
 }
-.autopilot-decision-ts {
+/* Vertical connector between dots — drawn under each row so the last
+ * row has no trailing tail. */
+.autopilot-timeline-row::before {
+  content: "";
+  position: absolute;
+  left: 10px;             /* center of the dot column */
+  top: 16px;              /* just below the dot */
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.autopilot-timeline-row:last-child::before { display: none; }
+
+.autopilot-timeline-dot {
+  width: 10px; height: 10px;
+  margin: 4px 0 0 4px;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 0 2px var(--surface);
+  position: relative; z-index: 1;
+  flex-shrink: 0;
+}
+/* Per-cmd dot colors so the timeline scans like a band-of-activity. */
+.autopilot-timeline-dot.cmd-forward { background: var(--ok); }
+.autopilot-timeline-dot.cmd-back    { background: #d97757; }
+.autopilot-timeline-dot.cmd-left    { background: #86b5d9; }
+.autopilot-timeline-dot.cmd-right   { background: #5e87b8; }
+.autopilot-timeline-dot.cmd-stop    { background: var(--bad); }
+.autopilot-timeline-row.bad .autopilot-timeline-dot {
+  background: var(--bad);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 6px var(--bad);
+}
+
+.autopilot-timeline-body { min-width: 0; }
+.autopilot-timeline-head {
+  display: flex; align-items: baseline; gap: 8px;
+}
+.autopilot-timeline-ts {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10px; color: var(--muted);
 }
-.autopilot-decision-reason {
+.autopilot-timeline-reason {
   font-size: 11px; line-height: 1.45;
   color: var(--text);
+  margin-top: 2px;
+  /* Collapsed: one line ellipsis. Clicking the row toggles .expanded
+   * which removes the clamp and wraps full text. */
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+.autopilot-timeline-row.expanded .autopilot-timeline-reason {
+  -webkit-line-clamp: unset;
+  display: block;
   white-space: pre-wrap;
   word-break: break-word;
 }
