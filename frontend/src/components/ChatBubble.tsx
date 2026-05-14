@@ -32,7 +32,7 @@ export function ChatBubble({ state, apiBase }: Props) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          messages: next,
+          messages: next.slice(-30),
           context: {
             pieegOnline: state.pieegOnline,
             roombaOk: state.roombaOk,

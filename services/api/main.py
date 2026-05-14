@@ -257,6 +257,14 @@ SYSTEM_INSTRUCTION = (
 )
 
 
+CHAT_MAX_MESSAGES = 40
+CHAT_MAX_TEXT_BYTES = 4 * 1024
+CHAT_MAX_CONTEXT_BYTES = 4 * 1024
+# Whitelist of context keys we accept. Anything else is dropped before the
+# snapshot is inlined into the prompt.
+CHAT_CONTEXT_KEYS = {"pieegOnline", "roombaOk", "decisionState", "threshold", "bandsNow"}
+
+
 @app.post("/chat")
 async def chat(body: dict[str, Any]) -> dict[str, Any]:
     """Multi-turn chat with a Gemini-backed assistant.
@@ -270,24 +278,31 @@ async def chat(body: dict[str, Any]) -> dict[str, Any]:
     msgs = body.get("messages") or []
     if not isinstance(msgs, list) or not msgs:
         raise HTTPException(status_code=400, detail="messages must be a non-empty array")
-    context = body.get("context") or {}
+    if len(msgs) > CHAT_MAX_MESSAGES:
+        msgs = msgs[-CHAT_MAX_MESSAGES:]
+
+    raw_context = body.get("context") or {}
+    context = {k: raw_context.get(k) for k in CHAT_CONTEXT_KEYS if k in raw_context}
+    snap = json.dumps(context, ensure_ascii=False, default=str)[:CHAT_MAX_CONTEXT_BYTES]
 
     contents = []
     for m in msgs:
         role = "user" if m.get("role") == "user" else "model"
-        text = str(m.get("text", ""))
+        text = str(m.get("text", ""))[:CHAT_MAX_TEXT_BYTES]
         if text:
             contents.append(gtypes.Content(role=role, parts=[gtypes.Part(text=text)]))
 
-    # Inject the live state snapshot just before the last user turn so it's
-    # always the freshest thing the model sees.
-    if contents and contents[-1].role == "user":
-        snap = json.dumps(context, ensure_ascii=False, default=str)
+    if not contents:
+        raise HTTPException(status_code=400, detail="no non-empty messages")
+
+    # Inject the live state snapshot as a leading part on the latest user turn
+    # so the model always sees the freshest state, not whatever was true 10
+    # turns ago.
+    if contents[-1].role == "user":
         contents[-1].parts.insert(0, gtypes.Part(text=f"[live snapshot] {snap}\n\n"))
 
     try:
-        resp = await asyncio.to_thread(
-            app.state.genai.models.generate_content,
+        resp = await app.state.genai.aio.models.generate_content(
             model=GEMINI_MODEL,
             contents=contents,
             config=gtypes.GenerateContentConfig(
@@ -295,9 +310,9 @@ async def chat(body: dict[str, Any]) -> dict[str, Any]:
                 temperature=0.4,
             ),
         )
-    except Exception as e:
+    except Exception:
         log.exception("gemini call failed")
-        raise HTTPException(status_code=502, detail=f"gemini: {e}") from e
+        raise HTTPException(status_code=502, detail="upstream model call failed") from None
 
     return {"text": resp.text or ""}
 
