@@ -104,9 +104,11 @@ export default function App() {
   }, []);
 
   // Rehydrate the trajectory + chip strip from DB on mount. WebSocket pushes
-  // for /roomba/cmd then keep extending the same array. Without this, a
-  // browser reload mid-run wipes the visible history even though the events
-  // are still in TimescaleDB.
+  // for roomba/cmd extend the same array in real time, so the merge here
+  // needs to be careful: if a WS event arrived between mount and this
+  // fetch resolving, the naive replace would clobber it; a naive bail
+  // (h.length>0 ? keep) would drop all pre-mount history. Merge by
+  // taking the DB seed plus any live events newer than its tail.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -115,10 +117,9 @@ export default function App() {
         if (!r.ok) return;
         const rows: { ts: number; cmd: string; ok: boolean }[] = await r.json();
         if (cancelled || rows.length === 0) return;
-        setTrajHistory((h) =>
-          // If WS already pushed something newer, keep that; otherwise seed.
-          h.length === 0 ? rows.map((r) => ({ ts: r.ts, cmd: r.cmd, ok: r.ok })) : h
-        );
+        const seedMax = rows[rows.length - 1].ts;
+        const seed: TrajectoryStep[] = rows.map((r) => ({ ts: r.ts, cmd: r.cmd, ok: r.ok }));
+        setTrajHistory((live) => [...seed, ...live.filter((e) => e.ts > seedMax)]);
       } catch {
         // transient — UI just starts empty, WS will fill in
       }

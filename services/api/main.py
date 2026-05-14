@@ -6,6 +6,7 @@ import base64
 import binascii
 import json
 import logging
+import math
 import os
 import re
 import time
@@ -101,6 +102,11 @@ async def lifespan(app: FastAPI):
     # AUTOPILOT_MAX_DECISIONS so the in-memory ring buffer stays small.
     try:
         await _hydrate_autopilot_decisions()
+    except asyncpg.UndefinedTableError:
+        # roomba_events isn't created yet — likely a brand new deployment that
+        # hasn't run the init.sql migration. Boot the api anyway and let the
+        # MQTT insert path surface the error if it actually matters.
+        log.warning("roomba_events table missing; skipping autopilot hydration")
     except Exception:  # noqa: BLE001 — never let a cold-start query break boot
         log.exception("autopilot decision hydration failed")
 
@@ -153,9 +159,19 @@ async def _record_roomba_event(raw: str) -> None:
     cmd = ev.get("cmd")
     src = ev.get("src", "manual")
     ok = bool(ev.get("ok", False))
-    ts_epoch = ev.get("ts")
+    raw_ts = ev.get("ts")
     if not isinstance(cmd, str) or not isinstance(src, str):
         return
+    # bool is a subclass of int in Python — exclude it so {"ts": true} doesn't
+    # land at epoch 1. Reject NaN/inf so asyncpg doesn't blow up downstream.
+    if (
+        isinstance(raw_ts, (int, float))
+        and not isinstance(raw_ts, bool)
+        and math.isfinite(float(raw_ts))
+    ):
+        ts_value = float(raw_ts)
+    else:
+        ts_value = time.time()
     try:
         async with app.state.pool.acquire() as conn:
             await conn.execute(
@@ -163,7 +179,7 @@ async def _record_roomba_event(raw: str) -> None:
                 INSERT INTO roomba_events (ts, cmd, ok, src, reason, mode, goal, model, err)
                 VALUES (to_timestamp($1), $2, $3, $4, $5, $6, $7, $8, $9)
                 """,
-                float(ts_epoch) if isinstance(ts_epoch, (int, float)) else time.time(),
+                ts_value,
                 cmd,
                 ok,
                 src,
