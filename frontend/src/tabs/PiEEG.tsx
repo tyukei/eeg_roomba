@@ -4,6 +4,7 @@ import uPlot from "uplot";
 import { AutoChart } from "../components/AutoChart";
 import { BandsGrid } from "../components/BandsGrid";
 import { BrainSvg } from "../components/BrainSvg";
+import { ChannelGrid } from "../components/ChannelGrid";
 import { CorrelationMatrix } from "../components/CorrelationMatrix";
 import { corrMatrix, welch } from "../fft";
 import { formatSI } from "../format";
@@ -32,7 +33,6 @@ export interface PiEEGTabProps {
 }
 
 export function PiEEG({ state, liveBuf, bandsBuf, tick }: PiEEGTabProps) {
-  void tick;
   const [ch, setCh] = useState(6);
   const [band, setBand] = useState<BandName>("alpha");
   const [scale, setScale] = useState<"linear" | "log">("log");
@@ -215,6 +215,14 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick }: PiEEGTabProps) {
           <small>Pearson r · ±1 = synced</small>
         </div>
         <CorrelationMatrix matrix={corr} selected={state.threshold.channels} />
+      </div>
+
+      <div className="panel full">
+        <div className="panel-head">
+          <h2>EEG live (16ch)</h2>
+          <small>10s window · each ch auto-scaled · decision chs accented</small>
+        </div>
+        <ChannelGrid liveBuf={liveBuf} selected={state.threshold.channels} tick={tick} />
       </div>
 
       <div className="panel full">
