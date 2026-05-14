@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface EegTriggerPanelProps {
   apiBase: string;
@@ -13,7 +13,7 @@ interface TriggerConfig {
   mode: "free" | "goal";
   interval: number;
   model: string;
-  last_state: "idle" | "active";
+  last_state: "idle" | "active" | null;
   last_transition_ts: number | null;
   model_available: boolean;
 }
@@ -24,7 +24,7 @@ const DEFAULT_CONFIG: TriggerConfig = {
   mode: "goal",
   interval: 3.0,
   model: "gemini-robotics-er-1.6-preview",
-  last_state: "idle",
+  last_state: null,
   last_transition_ts: null,
   model_available: true,
 };
@@ -36,14 +36,26 @@ const MODELS = [
 
 export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps) {
   const [cfg, setCfg] = useState<TriggerConfig>(DEFAULT_CONFIG);
+  // Locally-typed goal that's not yet persisted (committed on blur or before
+  // toggling enable). Tracked separately so React doesn't yank the cursor on
+  // every poll-driven setCfg.
+  const [goalDraft, setGoalDraft] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Stash the latest `enabled` so the polling effect can read it without
+  // depending on `cfg.enabled` directly (which would re-create the interval
+  // on every poll and on every keystroke into goal).
+  const enabledRef = useRef(cfg.enabled);
+  enabledRef.current = cfg.enabled;
+
   // Poll the current config so two tabs stay in sync. Slow when disabled
-  // (the user is probably not watching) and faster when enabled to catch
-  // last_state edges.
+  // (user probably isn't watching) and faster when enabled to catch
+  // last_state edges. The effect is mounted ONCE — interval recadences
+  // itself by reading `enabledRef` on each tick.
   useEffect(() => {
     let cancelled = false;
+    let id: ReturnType<typeof setTimeout>;
     const pull = async () => {
       try {
         const r = await fetch(`${apiBase}/eeg-trigger`);
@@ -52,14 +64,17 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
         if (!cancelled) setCfg(j);
       } catch {
         /* transient */
+      } finally {
+        if (!cancelled) {
+          id = setTimeout(pull, enabledRef.current ? 1500 : 5000);
+        }
       }
     };
     pull();
-    const id = setInterval(pull, cfg.enabled ? 1500 : 5000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [apiBase, cfg.enabled]);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [apiBase]);
 
-  const patch = async (body: Partial<TriggerConfig>) => {
+  const patch = useCallback(async (body: Partial<TriggerConfig>) => {
     setSubmitting(true);
     setErr(null);
     try {
@@ -74,19 +89,41 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
       }
       const j: TriggerConfig = await r.json();
       setCfg(j);
+      // Server is now authoritative for the goal; clear any unsaved draft.
+      if ("goal" in body) setGoalDraft(null);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
     } finally {
       setSubmitting(false);
     }
+  }, [apiBase]);
+
+  const toggleEnabled = async (next: boolean) => {
+    // If the user typed a new goal but never blurred, persist it before we
+    // arm the trigger. Otherwise the in-flight text would be silently lost.
+    if (next && goalDraft !== null && goalDraft !== cfg.goal) {
+      await patch({ goal: goalDraft, enabled: true });
+    } else {
+      await patch({ enabled: next });
+    }
   };
 
-  const pillClass = cfg.enabled
-    ? (decisionState === "active" ? "pill ok" : "pill")
-    : "pill muted";
-  const pillText = cfg.enabled
-    ? (decisionState === "active" ? "α active → autopilot ON" : "armed · waiting for α")
-    : "disabled";
+  // Three visual states for safety: OFF (idle) / ARMED (waiting for α) /
+  // FIRING (α-active, autopilot launched). "armed" must read distinctly
+  // from "off" — the robot may move at any moment.
+  let pillClass = "pill muted";
+  let pillText = "off";
+  if (cfg.enabled) {
+    if (decisionState === "active") {
+      pillClass = "pill ok";
+      pillText = "α active · autopilot ON";
+    } else {
+      pillClass = "pill warn";
+      pillText = "armed · waiting for α";
+    }
+  }
+
+  const goalValue = goalDraft ?? cfg.goal;
 
   return (
     <div className="panel eeg-trigger-panel">
@@ -97,24 +134,32 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
         </div>
 
         <div className="eeg-trigger-form">
-          <label className="eeg-trigger-toggle" title="Enable: α-power dominance auto-starts the autopilot (and stops it when α drops).">
+          <label
+            className={`eeg-trigger-toggle ${cfg.enabled ? "on" : ""}`}
+            title="Enable: α-power dominance auto-starts the autopilot toward the goal; auto-stops when α drops."
+          >
             <input
               type="checkbox"
               checked={cfg.enabled}
               disabled={submitting || !cfg.model_available}
-              onChange={(e) => patch({ enabled: e.target.checked })}
+              onChange={(e) => toggleEnabled(e.target.checked)}
+              aria-label="α-trigger enable"
             />
-            ON
+            {cfg.enabled ? "ON" : "OFF"}
           </label>
 
           <label>
             <span>goal</span>
             <input
               type="text"
-              value={cfg.goal}
+              value={goalValue}
               disabled={submitting || cfg.enabled}
-              onChange={(e) => setCfg((p) => ({ ...p, goal: e.target.value }))}
-              onBlur={(e) => { if (e.target.value !== cfg.goal) patch({ goal: e.target.value }); }}
+              onChange={(e) => setGoalDraft(e.target.value)}
+              onBlur={() => {
+                if (goalDraft !== null && goalDraft !== cfg.goal) {
+                  patch({ goal: goalDraft });
+                }
+              }}
               placeholder="e.g. 人間の足元"
             />
           </label>

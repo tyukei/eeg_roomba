@@ -461,6 +461,7 @@ body {
 }
 .pill.ok, .pill.active { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--border)); }
 .pill.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--border)); }
+.pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--border)); }
 .pill.idle { color: var(--muted); }
 
 /* Drag joystick — rendered as SVG so we control the perspective and stick. */
@@ -787,11 +788,16 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .eeg-trigger-form select:disabled,
 .eeg-trigger-form input:disabled { opacity: 0.55; cursor: not-allowed; }
 .eeg-trigger-state { font-size: 11px; color: var(--muted); }
-.eeg-trigger-state .pill { margin-left: 6px; }
-.eeg-trigger-actions { display: flex; }
 .eeg-trigger-toggle {
   display: inline-flex; align-items: center; gap: 6px;
   cursor: pointer; font-size: 11px;
+  padding: 2px 8px; border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.eeg-trigger-toggle.on {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--border));
 }
 .eeg-trigger-toggle input { transform: scale(1.15); cursor: pointer; }
 
