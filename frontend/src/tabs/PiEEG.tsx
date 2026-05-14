@@ -9,6 +9,7 @@ import { BrainSvg } from "../components/BrainSvg";
 import { ChannelGrid } from "../components/ChannelGrid";
 import { CorrelationMatrix } from "../components/CorrelationMatrix";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { ExpandablePanel } from "../components/ExpandablePanel";
 import { TimeChannelHeatmap } from "../components/TimeChannelHeatmap";
 import { corrMatrix, welch } from "../fft";
 import { formatSI } from "../format";
@@ -145,179 +146,130 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
     ? Math.log10(f4Alpha / f3Alpha)
     : NaN;
 
+  const bandSelect = (
+    <label className="small-label">band:
+      <select value={band} onChange={(e) => setBand(e.target.value as BandName)}>
+        {BAND_NAMES.map((b) => (<option key={b} value={b}>{b}</option>))}
+      </select>
+    </label>
+  );
+
   return (
     <>
       <AnalyzePanel apiBase={apiBase} targetRef={wrapRef} />
       <div className="analysis-wrap" ref={wrapRef}>
-      <div className="panel" style={{ gridColumn: 1, gridRow: "span 2" }} data-panel="Topography">
-        <div className="panel-head">
-          <h2>Topography</h2>
-          <label className="small-label">band:
-            <select value={band} onChange={(e) => setBand(e.target.value as BandName)}>
-              {BAND_NAMES.map((b) => (<option key={b} value={b}>{b}</option>))}
-            </select>
-          </label>
-        </div>
-        <BrainSvg values={topoValues} selected={state.threshold.channels} />
-        <div className="brain-meta">
-          <small>color = {band} band power · decision chs highlighted</small>
-        </div>
-        <div className="electrode-table-wrap" style={{ marginTop: 14 }}>
-          <table className="electrode-table">
-            <thead>
-              <tr><th>ch</th><th>label</th><th>region</th><th>{band}</th></tr>
-            </thead>
-            <tbody>
-              {MONTAGE.map((e) => (
-                <tr
-                  key={e.ch}
-                  className={hoveredCh === e.ch ? "row-hovered" : ""}
-                  onPointerEnter={() => setHoveredCh(e.ch)}
-                  onPointerLeave={() => setHoveredCh(null)}
-                >
-                  <td><strong>ch{e.ch}</strong></td>
-                  <td>{e.name}</td>
-                  <td><span className="region-chip">{e.region}</span></td>
-                  <td>{formatSI(topoValues[e.ch] ?? 0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
-
-      <div className="panel" style={{ gridColumn: "2 / span 2", gridRow: 1 }} data-panel="Band power 60s">
-        <div className="panel-head">
-          <h2>Band power · 60s</h2>
-          <div className="row" style={{ gap: 8 }}>
-            <label className="small-label">ch:
-              <select value={ch} onChange={(e) => setCh(Number(e.target.value))}>
-                {Array.from({ length: NCH }, (_, i) => (<option key={i} value={i}>ch{i}</option>))}
-              </select>
-            </label>
-            <label className="small-label">y:
-              <select value={scale} onChange={(e) => setScale(e.target.value as any)}>
-                <option value="linear">linear</option>
-                <option value="log">log</option>
-              </select>
-            </label>
+        <ExpandablePanel
+          title="Topography"
+          dataPanel="Topography"
+          headExtras={bandSelect}
+        >
+          <BrainSvg values={topoValues} selected={state.threshold.channels} />
+          <div className="brain-meta">
+            <small>color = {band} band power · decision chs highlighted</small>
           </div>
-        </div>
-        <div className="chart"><AutoChart baseOpts={bandsOpts} data={bandsData} /></div>
-      </div>
+          <div className="electrode-table-wrap" style={{ marginTop: 14 }}>
+            <table className="electrode-table">
+              <thead>
+                <tr><th>ch</th><th>label</th><th>region</th><th>{band}</th></tr>
+              </thead>
+              <tbody>
+                {MONTAGE.map((e) => (
+                  <tr
+                    key={e.ch}
+                    className={hoveredCh === e.ch ? "row-hovered" : ""}
+                    onPointerEnter={() => setHoveredCh(e.ch)}
+                    onPointerLeave={() => setHoveredCh(null)}
+                  >
+                    <td><strong>ch{e.ch}</strong></td>
+                    <td>{e.name}</td>
+                    <td><span className="region-chip">{e.region}</span></td>
+                    <td>{formatSI(topoValues[e.ch] ?? 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ExpandablePanel>
 
-      <div className="panel" style={{ gridColumn: 2, gridRow: 2 }} data-panel="PSD">
-        <div className="panel-head">
-          <h2>PSD · ch{ch}</h2>
-          <small>Welch · 10s · log y</small>
-        </div>
-        <AutoChart baseOpts={psdOpts} data={psdData} />
-      </div>
+        <ExpandablePanel
+          title={<>3D Brain · {band}</>}
+          subtitle="drag · auto-spin · hover to highlight"
+          dataPanel="3D Brain"
+          className="brain3d-panel"
+        >
+          <ErrorBoundary
+            fallback={(err) => (
+              <div className="brain3d-loading">3D brain failed to load: {err.message}</div>
+            )}
+          >
+            <Suspense fallback={<div className="brain3d-loading">loading 3D brain…</div>}>
+              <BrainParticles3D
+                values={topoValues}
+                band={band}
+                hovered={hoveredCh}
+                onHover={setHoveredCh}
+                onSelect={(c) => setCh(c)}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        </ExpandablePanel>
 
-      <div className="panel" style={{ gridColumn: 3, gridRow: 2 }} data-panel="Bands">
-        <div className="panel-head"><h2>Bands · ch{ch}</h2></div>
-        <div className="band-bars">
-          {bandsHere.map((b) => (
-            <div className="band-bar" key={b.band}>
-              <div className="band-bar-fill" style={{ height: `${(b.value / bandMax) * 100}%`, background: BAND_COLORS[b.band] }} />
-              <div className="band-bar-label">
-                <strong>{b.band}</strong>
-                <small>{BAND_RANGES[b.band][0]}-{BAND_RANGES[b.band][1]}Hz</small>
-                <span>{formatSI(b.value)}</span>
+        <ExpandablePanel
+          title={<>Bands · ch{ch}</>}
+          dataPanel="Bands"
+        >
+          <div className="band-bars">
+            {bandsHere.map((b) => (
+              <div className="band-bar" key={b.band}>
+                <div className="band-bar-fill" style={{ height: `${(b.value / bandMax) * 100}%`, background: BAND_COLORS[b.band] }} />
+                <div className="band-bar-label">
+                  <strong>{b.band}</strong>
+                  <small>{BAND_RANGES[b.band][0]}-{BAND_RANGES[b.band][1]}Hz</small>
+                  <span>{formatSI(b.value)}</span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
+            ))}
+          </div>
+        </ExpandablePanel>
 
-      <div className="panel full brain3d-panel" data-panel="3D Brain">
-        <div className="panel-head">
-          <h2>3D Brain · {band}</h2>
-          <small>drag to rotate · auto-spins · hover an electrode to light it up everywhere</small>
-        </div>
-        <ErrorBoundary
-          fallback={(err) => (
-            <div className="brain3d-loading">3D brain failed to load: {err.message}</div>
+        <ExpandablePanel
+          title="Band power · 60s"
+          dataPanel="Band power 60s"
+          spanColumns={2}
+          headExtras={(
+            <div className="row" style={{ gap: 8 }}>
+              <label className="small-label">ch:
+                <select value={ch} onChange={(e) => setCh(Number(e.target.value))}>
+                  {Array.from({ length: NCH }, (_, i) => (<option key={i} value={i}>ch{i}</option>))}
+                </select>
+              </label>
+              <label className="small-label">y:
+                <select value={scale} onChange={(e) => setScale(e.target.value as any)}>
+                  <option value="linear">linear</option>
+                  <option value="log">log</option>
+                </select>
+              </label>
+            </div>
           )}
         >
-          <Suspense fallback={<div className="brain3d-loading">loading 3D brain…</div>}>
-            <BrainParticles3D
-              values={topoValues}
-              band={band}
-              selected={state.threshold.channels}
-              hovered={hoveredCh}
-              onHover={setHoveredCh}
-              onSelect={(c) => setCh(c)}
-            />
-          </Suspense>
-        </ErrorBoundary>
-      </div>
+          <div className="chart"><AutoChart baseOpts={bandsOpts} data={bandsData} /></div>
+        </ExpandablePanel>
 
-      <div className="panel full" data-panel="EEG live">
-        <div className="panel-head">
-          <h2>EEG live (16ch)</h2>
-          <small>10s window · each ch auto-scaled · decision chs accented · hover to highlight everywhere</small>
-        </div>
-        <ChannelGrid
-          liveBuf={liveBuf}
-          selected={state.threshold.channels}
-          tick={tick}
-          hovered={hoveredCh}
-          onHover={setHoveredCh}
-        />
-      </div>
+        <ExpandablePanel
+          title={<>PSD · ch{ch}</>}
+          subtitle="Welch · 10s · log y"
+          dataPanel="PSD"
+        >
+          <AutoChart baseOpts={psdOpts} data={psdData} />
+        </ExpandablePanel>
 
-      <div className="panel full" data-panel="Per-channel bands">
-        <div className="panel-head">
-          <h2>Per-channel bands</h2>
-          <small>each ch normalised independently · δ θ α β γ from left</small>
-        </div>
-        <BandsGrid
-          state={state}
-          selected={state.threshold.channels}
-          hovered={hoveredCh}
-          onHover={setHoveredCh}
-        />
-      </div>
-
-      <div className="panel full" data-panel="Channel × Band heatmap">
-        <div className="panel-head">
-          <h2>Channel × Band heatmap</h2>
-          <small>per-band normalised · 16 rows × 5 cols · color = relative power</small>
-        </div>
-        <BandHeatmap state={state} hovered={hoveredCh} onHover={setHoveredCh} />
-      </div>
-
-      <div className="panel full" data-panel="Time × Channel heatmap">
-        <div className="panel-head">
-          <h2>Time × Channel · {band}</h2>
-          <small>60s history of the selected band across all channels · newest on the right</small>
-        </div>
-        <TimeChannelHeatmap
-          bandsBuf={bandsBuf}
-          band={band}
-          tick={tick}
-          hovered={hoveredCh}
-          onHover={setHoveredCh}
-        />
-      </div>
-      </div>
-
-      <div className="analysis-bottom">
-        <div className="panel" data-panel="Channel correlation">
-          <div className="panel-head">
-            <h2>Channel correlation · 10s</h2>
-            <small>Pearson r · ±1 = synced</small>
-          </div>
-          <CorrelationMatrix matrix={corr} selected={state.threshold.channels} />
-        </div>
-
-        <div className="panel" data-panel="Cognitive metrics">
-          <div className="panel-head">
-            <h2>Cognitive metrics</h2>
-            <small>over decision chs {decisionChs.map((c) => `ch${c}`).join(", ")} · frontal asym uses F3/F4</small>
-          </div>
+        <ExpandablePanel
+          title="Cognitive metrics"
+          subtitle={`decision chs ${decisionChs.map((c) => `ch${c}`).join(", ")} · frontal asym F3/F4`}
+          dataPanel="Cognitive metrics"
+          spanColumns={2}
+        >
           <div className="cog-grid">
             <Stat label="Engagement"
                   value={engagement.toFixed(2)}
@@ -338,7 +290,68 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
                   value={formatSI(meanTheta)}
                   hint={`mean over ${decisionChs.length} ch`} />
           </div>
-        </div>
+        </ExpandablePanel>
+
+        <ExpandablePanel
+          title="Channel × Band heatmap"
+          subtitle="per-band normalised"
+          dataPanel="Channel × Band heatmap"
+        >
+          <BandHeatmap state={state} hovered={hoveredCh} onHover={setHoveredCh} />
+        </ExpandablePanel>
+
+        <ExpandablePanel
+          title={<>Time × Channel · {band}</>}
+          subtitle="60s history · newest on the right"
+          dataPanel="Time × Channel heatmap"
+          spanColumns={2}
+        >
+          <TimeChannelHeatmap
+            bandsBuf={bandsBuf}
+            band={band}
+            tick={tick}
+            hovered={hoveredCh}
+            onHover={setHoveredCh}
+          />
+        </ExpandablePanel>
+
+        <ExpandablePanel
+          title="Channel correlation · 10s"
+          subtitle="Pearson r · ±1 = synced"
+          dataPanel="Channel correlation"
+        >
+          <CorrelationMatrix matrix={corr} selected={state.threshold.channels} />
+        </ExpandablePanel>
+
+        <ExpandablePanel
+          title="EEG live (16ch)"
+          subtitle="10s window · hover to highlight"
+          dataPanel="EEG live"
+          spanColumns={2}
+        >
+          <ChannelGrid
+            liveBuf={liveBuf}
+            selected={state.threshold.channels}
+            tick={tick}
+            hovered={hoveredCh}
+            onHover={setHoveredCh}
+          />
+        </ExpandablePanel>
+
+        <ExpandablePanel
+          title="Per-channel bands"
+          subtitle="δ θ α β γ from left · each ch normalised"
+          dataPanel="Per-channel bands"
+          spanColumns={3}
+        >
+          <BandsGrid
+            state={state}
+            selected={state.threshold.channels}
+            hovered={hoveredCh}
+            onHover={setHoveredCh}
+          />
+        </ExpandablePanel>
+
       </div>
     </>
   );
