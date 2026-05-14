@@ -104,44 +104,61 @@ body {
 }
 .side { display: flex; flex-direction: column; gap: 20px; }
 
-/* Roomba tab — camera, trajectory map, joystick all in one row.
-   Recent-commands table wraps to a full-width row below. The camera
-   and trajectory panels cap their visual height so a wide viewport
-   doesn't blow them up taller than the joystick column. */
+/* Roomba tab — compact 3-row layout that fits on one screen without
+   scrolling:
+     row 1: camera | trajectory | joystick
+     row 2: autopilot (single horizontal strip, full width)
+     row 3: recent-commands chip strip (full width)
+   Side column is gone; connect/disconnect collapsed into the joystick
+   panel header. */
 .roomba-wrap {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 240px;
   grid-template-areas:
     "cam  traj  ctrl"
+    "auto auto  auto"
     "cmds cmds  cmds";
-  gap: 16px;
+  gap: 12px;
   align-items: start;
 }
 .roomba-wrap > .cam-panel          { grid-area: cam; }
 .roomba-wrap > .traj-map-panel     { grid-area: traj; }
-.roomba-wrap > .side               { grid-area: ctrl; }
-.roomba-wrap > .panel:last-of-type { grid-area: cmds; }
+.roomba-wrap > .ctrl-panel         { grid-area: ctrl; }
+.roomba-wrap > .autopilot-panel    { grid-area: auto; }
+.roomba-wrap > .cmds-panel         { grid-area: cmds; }
 
-/* Constrain camera + trajectory heights so a 1920-wide viewport doesn't
-   blow them up taller than the joystick. The aspect-ratio rule on .cam-area
-   keeps the width proportional once height is capped. */
-.roomba-wrap .cam-area { max-height: 280px; max-width: 100%; aspect-ratio: 4 / 3; }
+/* Tighter panel padding in this view so the whole tab fits vertically. */
+.roomba-wrap .panel { padding: 10px 12px; }
+.roomba-wrap .panel-head { margin-bottom: 6px; }
+.roomba-wrap .panel-head h2 { font-size: 12px; letter-spacing: .06em; }
+
+/* Camera / trajectory share the same capped height. */
+.roomba-wrap .cam-area { max-height: 240px; max-width: 100%; aspect-ratio: 4 / 3; }
 .roomba-wrap .cam-area img { object-fit: contain; }
 .roomba-wrap .traj-canvas { display: flex; justify-content: center; }
-.roomba-wrap .traj-canvas svg { max-height: 280px; width: auto; max-width: 100%; }
-@media (max-width: 1400px) {
+.roomba-wrap .traj-canvas svg { max-height: 240px; width: auto; max-width: 100%; }
+
+.ctrl-panel .ctrl-conn { display: flex; gap: 4px; }
+.btn.xsmall {
+  padding: 2px 8px;
+  font-size: 10px;
+  letter-spacing: .04em;
+}
+
+@media (max-width: 1280px) {
   .roomba-wrap {
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 1fr) 240px;
     grid-template-areas:
       "cam  ctrl"
       "traj ctrl"
+      "auto auto"
       "cmds cmds";
   }
 }
-@media (max-width: 1000px) {
+@media (max-width: 900px) {
   .roomba-wrap {
     grid-template-columns: 1fr;
-    grid-template-areas: "cam" "traj" "ctrl" "cmds";
+    grid-template-areas: "cam" "traj" "ctrl" "auto" "cmds";
   }
 }
 
@@ -651,7 +668,93 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   color: var(--bad);
 }
 
-/* Autopilot panel (Roomba tab side column) */
+/* Recent commands compact chip strip (Roomba tab row 3) */
+.cmds-panel .cmd-strip {
+  display: flex; flex-wrap: nowrap; gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.cmds-panel .cmd-chip {
+  display: inline-block; padding: 2px 7px;
+  background: var(--surface-2); color: var(--text);
+  border-radius: 10px;
+  font-size: 10px; font-weight: 500;
+  flex: 0 0 auto;
+}
+.cmds-panel .cmd-chip.bad {
+  background: color-mix(in srgb, var(--bad) 22%, var(--surface-2));
+  color: var(--bad);
+}
+.cmds-panel .cmd-strip-empty { color: var(--muted); font-size: 11px; }
+
+/* Autopilot panel — horizontal strip (Roomba tab row 2) */
+.autopilot-horizontal .autopilot-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+.autopilot-strip-head {
+  display: flex; align-items: center; gap: 8px;
+}
+.autopilot-strip-head strong {
+  font-size: 12px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.autopilot-strip-form {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  align-items: center;
+}
+.autopilot-strip-form label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--muted);
+}
+.autopilot-strip-form label > span {
+  text-transform: uppercase; letter-spacing: .04em;
+  font-size: 10px;
+}
+.autopilot-strip-form select,
+.autopilot-strip-form input[type="text"],
+.autopilot-strip-form input[type="number"] {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font: inherit; font-size: 11px;
+}
+.autopilot-strip-form input[type="number"] { width: 56px; }
+.autopilot-strip-form input[type="text"] { width: 140px; }
+.autopilot-strip-form select:disabled,
+.autopilot-strip-form input:disabled {
+  opacity: 0.55; cursor: not-allowed;
+}
+.autopilot-strip-decision {
+  display: flex; align-items: center; gap: 8px;
+  min-width: 0;
+}
+.autopilot-strip-reason {
+  font-size: 11px; line-height: 1.4;
+  color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1; min-width: 0;
+}
+.autopilot-strip-actions { display: flex; }
+.autopilot-strip-err {
+  margin-top: 6px;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+@media (max-width: 1100px) {
+  .autopilot-horizontal .autopilot-strip {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .autopilot-strip-decision { border-top: 1px solid var(--border); padding-top: 6px; }
+}
+
+/* Autopilot panel (vertical / legacy layout — kept for fallback) */
 .autopilot-panel .pill.muted {
   background: var(--surface-2); color: var(--muted);
 }
