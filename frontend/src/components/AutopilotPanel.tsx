@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 
 export interface AutopilotPanelProps {
   apiBase: string;
+  /** "horizontal" packs every control + status into one strip for the
+   *  compact Roomba tab; "vertical" is the original stacked form. */
+  layout?: "horizontal" | "vertical";
 }
 
 interface Decision {
@@ -36,7 +39,7 @@ const MODELS = [
   "gemini-robotics-er-1.5-preview",
 ];
 
-export function AutopilotPanel({ apiBase }: AutopilotPanelProps) {
+export function AutopilotPanel({ apiBase, layout = "vertical" }: AutopilotPanelProps) {
   const [status, setStatus] = useState<Status>(DEFAULT_STATUS);
   const [mode, setMode] = useState<"free" | "goal">("free");
   const [goal, setGoal] = useState("");
@@ -45,8 +48,6 @@ export function AutopilotPanel({ apiBase }: AutopilotPanelProps) {
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Poll faster while running, slower while idle — autopilot decisions arrive
-  // every `interval` seconds, so 1.5s gives a one-tick lag at most.
   useEffect(() => {
     let cancelled = false;
     const fetchStatus = async () => {
@@ -56,7 +57,7 @@ export function AutopilotPanel({ apiBase }: AutopilotPanelProps) {
         const j: Status = await r.json();
         if (!cancelled) setStatus(j);
       } catch {
-        // transient: leave previous status as-is
+        // transient
       }
     };
     fetchStatus();
@@ -99,8 +100,123 @@ export function AutopilotPanel({ apiBase }: AutopilotPanelProps) {
 
   const lastCmd = status.last_command;
   const lastReason = status.last_reason;
-  const recent = [...status.decisions].reverse().slice(0, 8);
 
+  if (layout === "horizontal") {
+    // One-row strip: pill + form + last decision + start/stop.
+    return (
+      <div className="panel autopilot-panel autopilot-horizontal">
+        <div className="autopilot-strip">
+          <div className="autopilot-strip-head">
+            <strong>Autopilot</strong>
+            <span
+              className={`pill ${status.running ? "ok" : "muted"}`}
+              role="status"
+              aria-live="polite"
+            >
+              {status.running ? "running" : "stopped"}
+            </span>
+          </div>
+
+          <div className="autopilot-strip-form">
+            <label>
+              <span>mode</span>
+              <select
+                value={mode}
+                disabled={status.running}
+                onChange={(e) => setMode(e.target.value as "free" | "goal")}
+              >
+                <option value="free">free</option>
+                <option value="goal">goal</option>
+              </select>
+            </label>
+
+            {mode === "goal" && (
+              <label className="autopilot-strip-goal">
+                <span>goal</span>
+                <input
+                  type="text"
+                  placeholder="e.g. red chair"
+                  value={goal}
+                  disabled={status.running}
+                  onChange={(e) => setGoal(e.target.value)}
+                />
+              </label>
+            )}
+
+            <label>
+              <span>every</span>
+              <input
+                type="number"
+                min={1}
+                max={30}
+                step={0.5}
+                value={interval}
+                disabled={status.running}
+                onChange={(e) => setIntervalSec(parseFloat(e.target.value) || 3.0)}
+              />
+              <small>s</small>
+            </label>
+
+            <label>
+              <span>model</span>
+              <select
+                value={model}
+                disabled={status.running}
+                onChange={(e) => setModel(e.target.value)}
+              >
+                {MODELS.map((m) => (
+                  <option key={m} value={m}>{m.replace("gemini-robotics-er-", "")}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="autopilot-strip-decision">
+            {(lastCmd || lastReason) ? (
+              <>
+                {lastCmd && <span className="cmd-tag">{lastCmd}</span>}
+                <span className="autopilot-strip-reason" title={lastReason ?? ""}>
+                  {lastReason || "—"}
+                </span>
+              </>
+            ) : (
+              <small>no decision yet</small>
+            )}
+          </div>
+
+          <div className="autopilot-strip-actions">
+            {!status.running ? (
+              <button className="btn small" disabled={submitting || !status.model_available} onClick={start}>
+                start
+              </button>
+            ) : (
+              <button className="btn small stop" disabled={submitting} onClick={stop}>
+                stop
+              </button>
+            )}
+          </div>
+        </div>
+
+        {(err || (status.last_error && !err)) && (
+          <div
+            className="analyze-err autopilot-strip-err"
+            role={err ? "alert" : "status"}
+            aria-live={err ? "assertive" : "polite"}
+          >
+            {err ?? status.last_error}
+          </div>
+        )}
+        {!status.model_available && (
+          <div className="analyze-err autopilot-strip-err" role="alert">
+            GEMINI_API_KEY not set on api service — autopilot disabled.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ---- vertical (original) layout, kept for any future caller ----
+  const recent = [...status.decisions].reverse().slice(0, 8);
   return (
     <div className="panel autopilot-panel">
       <div className="panel-head">

@@ -68,7 +68,7 @@ export function Roomba({ state, history, apiBase, camOn, setCamOn }: RoombaTabPr
   const lastCmds = history.slice(-12).reverse();
 
   return (
-    <div className="roomba-wrap">
+    <div className="roomba-wrap compact">
       <div className="panel cam-panel">
         <div className="panel-head">
           <h2>Camera</h2>
@@ -104,30 +104,9 @@ export function Roomba({ state, history, apiBase, camOn, setCamOn }: RoombaTabPr
         </div>
       </div>
 
-      <div className="side">
-        <div className="panel">
-          <div className="panel-head"><h2>Status</h2></div>
-          <div className="kv">
-            <span>Roomba</span>
-            <span className={`pill ${state.roombaOk ? "ok" : "bad"}`}>{state.roombaOk ? "online" : "offline"}</span>
-          </div>
-          <div className="row" style={{ marginTop: 10, gap: 6 }}>
-            <button className="btn small" onClick={() => fetch(`${apiBase}/control/connect`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })}>connect</button>
-            <button className="btn small stop" onClick={() => fetch(`${apiBase}/control/disconnect`, { method: "POST" })}>disconnect</button>
-          </div>
-        </div>
-
-        <div className="panel">
-          <div className="panel-head"><h2>Control</h2><small>arrows / space</small></div>
-          <Joystick onCmd={cmd} />
-        </div>
-
-        <AutopilotPanel apiBase={apiBase} />
-      </div>
-
       <div className="panel traj-map-panel">
         <div className="panel-head">
-          <h2>Trajectory (dead-reckoned)</h2>
+          <h2>Trajectory</h2>
           <small>{history.length} events</small>
         </div>
         <div className="traj-canvas">
@@ -140,7 +119,6 @@ export function Roomba({ state, history, apiBase, camOn, setCamOn }: RoombaTabPr
               <line key={`h${i}`} x1={0} y1={i * 40} x2={w} y2={i * 40} stroke="var(--border)" strokeWidth={1} opacity={0.4} />
             ))}
             <circle cx={cx} cy={cy} r={5} fill="var(--ok)" stroke="var(--bg)" strokeWidth={2} />
-            <text x={cx + 10} y={cy + 4} fontSize={11} fill="var(--muted)">start</text>
             {path.length > 1 && (
               <polyline
                 points={path.map((p) => `${p.x + cx},${p.y + cy}`).join(" ")}
@@ -154,26 +132,34 @@ export function Roomba({ state, history, apiBase, camOn, setCamOn }: RoombaTabPr
             )}
           </svg>
         </div>
-        <div className="traj-meta">
-          <small>+forward = direction of nose. Step length / turn angle illustrative (no odometry).</small>
-        </div>
       </div>
 
-      <div className="panel">
-        <div className="panel-head"><h2>Recent commands</h2></div>
-        <table className="cmd-table">
-          <thead><tr><th>time</th><th>cmd</th><th>result</th></tr></thead>
-          <tbody>
-            {lastCmds.length === 0 && <tr><td colSpan={3} style={{ color: "var(--muted)" }}>(none yet)</td></tr>}
-            {lastCmds.map((c, i) => (
-              <tr key={i}>
-                <td>{new Date(c.ts * 1000).toLocaleTimeString()}</td>
-                <td><span className="cmd-tag">{c.cmd}</span></td>
-                <td>{c.ok ? <span className="pill ok">ok</span> : <span className="pill bad">err</span>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="panel ctrl-panel">
+        <div className="panel-head">
+          <h2>Control</h2>
+          <div className="ctrl-conn">
+            <button className="btn xsmall" onClick={() => fetch(`${apiBase}/control/connect`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })}>conn</button>
+            <button className="btn xsmall stop" onClick={() => fetch(`${apiBase}/control/disconnect`, { method: "POST" })}>disc</button>
+          </div>
+        </div>
+        <Joystick onCmd={cmd} />
+      </div>
+
+      <AutopilotPanel apiBase={apiBase} layout="horizontal" />
+
+      <div className="panel cmds-panel">
+        <div className="panel-head">
+          <h2>Recent</h2>
+          <small>{lastCmds.length === 0 ? "none yet" : `${history.length} total`}</small>
+        </div>
+        <div className="cmd-strip">
+          {lastCmds.length === 0 && <span className="cmd-strip-empty">—</span>}
+          {lastCmds.map((c, i) => (
+            <span key={i} className={`cmd-chip ${c.ok ? "" : "bad"}`} title={new Date(c.ts * 1000).toLocaleTimeString()}>
+              {c.cmd}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
