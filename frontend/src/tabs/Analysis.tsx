@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import UplotReact from "uplot-react";
 import uPlot from "uplot";
 
+import { AutoChart } from "../components/AutoChart";
 import { BrainSvg } from "../components/BrainSvg";
 import { CorrelationMatrix } from "../components/CorrelationMatrix";
 import { corrMatrix, welch } from "../fft";
@@ -38,10 +38,10 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bb.ts.length, bb.ts[bb.ts.length - 1], ch]);
 
-  const bandsOpts = useMemo<uPlot.Options>(() => {
+  const bandsOpts = useMemo<Omit<uPlot.Options, "width">>(() => {
     const c = themeColors();
     return {
-      width: 900, height: 220,
+      height: 220,
       scales: { x: { time: true }, y: { auto: true, distr: scale === "log" ? 3 : 1 } },
       series: [
         {},
@@ -67,10 +67,10 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lb.ts.length, ch]);
 
-  const psdOpts = useMemo<uPlot.Options>(() => {
+  const psdOpts = useMemo<Omit<uPlot.Options, "width">>(() => {
     const c = themeColors();
     return {
-      width: 500, height: 200,
+      height: 200,
       scales: { x: { time: false }, y: { auto: true, distr: 3 } },
       series: [
         { label: "f (Hz)" },
@@ -151,7 +151,7 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
             </label>
           </div>
         </div>
-        <div className="chart"><UplotReact options={bandsOpts} data={bandsData} /></div>
+        <div className="chart"><AutoChart baseOpts={bandsOpts} data={bandsData} /></div>
       </div>
 
       <div className="panel" style={{ gridColumn: 2, gridRow: 2 }}>
@@ -159,9 +159,7 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
           <h2>PSD · ch{ch}</h2>
           <small>Welch · 10s · log y</small>
         </div>
-        <div style={{ width: "100%", height: 200 }}>
-          <UplotReact options={psdOpts} data={psdData} />
-        </div>
+        <AutoChart baseOpts={psdOpts} data={psdData} />
       </div>
 
       <div className="panel" style={{ gridColumn: 3, gridRow: 2 }}>

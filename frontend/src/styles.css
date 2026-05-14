@@ -288,9 +288,12 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 }
 
 /* Analysis tab — 3-column grid */
+/* Analysis tab: stage the layout in three breakpoints so panels never
+   overflow into one another.
+     ≥1600px → 4 cols: Topo | Band Power+PSD | BANDS | Correlation
+     1200–1599 → 3 cols: Topo | Band Power+PSD | BANDS, corr below full
+     <1200    → 1 col stacked */
 .analysis-wrap {
-  /* col 4 must stay >= 460 so the 16x16 correlation SVG renders at
-     its intrinsic 414px without shrinking labels below readability. */
   display: grid;
   grid-template-columns:
     minmax(280px, 340px)
@@ -308,6 +311,18 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .analysis-wrap .panel.corr-panel {
   grid-column: 4; grid-row: 1 / span 2;
   align-self: stretch;
+}
+@media (max-width: 1599px) {
+  .analysis-wrap {
+    grid-template-columns:
+      minmax(280px, 340px)
+      minmax(0, 1fr)
+      minmax(180px, 220px);
+  }
+  .analysis-wrap .panel.corr-panel {
+    grid-column: 1 / -1; grid-row: auto;
+    align-self: auto;
+  }
 }
 
 .band-bars {

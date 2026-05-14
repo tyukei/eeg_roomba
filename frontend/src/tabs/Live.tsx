@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
-import UplotReact from "uplot-react";
 import uPlot from "uplot";
 
+import { AutoChart } from "../components/AutoChart";
 import { Joystick } from "../components/Joystick";
 import { Slider } from "../components/Slider";
 import { formatSI } from "../format";
@@ -40,10 +40,10 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
 
   const selectedChs = state.threshold.channels;
 
-  const chartOpts = useMemo<uPlot.Options>(() => {
+  const chartOpts = useMemo<Omit<uPlot.Options, "width">>(() => {
     const c = themeColors();
     return {
-      width: 800, height: 300,
+      height: 300,
       scales: { x: { time: true }, y: { auto: true } },
       series: [{}, ...Array.from({ length: NCH }, (_, i) => ({
         label: `ch${i}`,
@@ -102,7 +102,7 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
               </small>
             </div>
           ) : (
-            <UplotReact options={chartOpts} data={chartData} />
+            <AutoChart baseOpts={chartOpts} data={chartData} />
           )}
         </div>
 
