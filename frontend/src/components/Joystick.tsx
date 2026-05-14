@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 
-// Visual constants (SVG units). The viewBox is centered at x=0 with the
-// dish hinge at y=50 so the rest position of the knob (above the dish)
-// reads as "looking down at an angle" rather than top-down.
-const VB = { x: -120, y: -110, w: 240, h: 220 };
+// Visual constants (SVG units). Camera is closer to "above" than "in front"
+// so vertical drag (front/back) maps to a long visible knob travel rather
+// than getting compressed into a thin band of pixels.
+const VB = { x: -120, y: -125, w: 240, h: 245 };
 const DISH_CX = 0;
-const DISH_CY = 50;
-const DISH_RX = 96;
-const DISH_RY = 24;        // squashed = perspective
-const KNOB_R = 24;
-const REST_Y = -28;        // rest position above the dish hinge
-const MAX_X = 70;          // knob travel — horizontal
-const MAX_Y_UP = 36;       // travel up   (perspective shortened)
-const MAX_Y_DN = 28;       // travel down (perspective shortened more)
+const DISH_CY = 35;
+const DISH_RX = 92;
+const DISH_RY = 58;        // less squashed = viewed from higher
+const KNOB_R = 22;
+const REST_Y = -6;         // small offset so the stick is still visible
+const MAX_X = 74;          // horizontal travel
+const MAX_Y_UP = 80;       // front (up on screen) — generous
+const MAX_Y_DN = 72;       // back (down on screen) — almost symmetric
 const DEADZONE = 0.22;     // fraction of max before any command fires
 const REPEAT_MS = 280;     // re-send the held direction at this cadence
 
@@ -197,30 +197,31 @@ export function Joystick({ onCmd }: { onCmd: (c: Dir) => Promise<void> | void })
         </defs>
 
         {/* ground / dish drop shadow */}
-        <ellipse cx={DISH_CX} cy={DISH_CY + 12} rx={DISH_RX + 6} ry={DISH_RY + 4}
+        <ellipse cx={DISH_CX} cy={DISH_CY + 14} rx={DISH_RX + 6} ry={DISH_RY * 0.35}
                  fill="rgba(0,0,0,0.55)" filter="url(#joy-soft)" />
 
         {/* dish */}
         <ellipse cx={DISH_CX} cy={DISH_CY} rx={DISH_RX} ry={DISH_RY} fill="url(#joy-dish)" />
-        {/* dish top rim highlight */}
-        <ellipse cx={DISH_CX} cy={DISH_CY - DISH_RY + 2} rx={DISH_RX - 4} ry={2.2}
+        {/* dish outer rim highlight (top) */}
+        <ellipse cx={DISH_CX} cy={DISH_CY - DISH_RY + 3} rx={DISH_RX - 6} ry={3}
                  fill="rgba(255,255,255,0.10)" />
-        {/* dish inner hole (where the stick comes out) */}
-        <ellipse cx={DISH_CX} cy={DISH_CY - 2} rx={18} ry={6}
+        {/* dish inner hole (where the stick comes out) — same aspect as dish */}
+        <ellipse cx={DISH_CX} cy={DISH_CY - 1} rx={20} ry={14}
                  fill="#0a0d14" />
-        <ellipse cx={DISH_CX} cy={DISH_CY - 3} rx={16} ry={4}
+        <ellipse cx={DISH_CX} cy={DISH_CY - 2} rx={17} ry={11}
                  fill="rgba(0,0,0,0.7)" />
 
-        {/* stick — thick line from dish hinge to knob */}
-        <line x1={DISH_CX} y1={DISH_CY - 2} x2={pos.x} y2={pos.y + KNOB_R * 0.55}
-              stroke="url(#joy-stick)" strokeWidth={16} strokeLinecap="round" />
-        {/* stick highlight (top-left side) */}
-        <line x1={DISH_CX - 3} y1={DISH_CY - 2} x2={pos.x - 3} y2={pos.y + KNOB_R * 0.55}
-              stroke="rgba(255,255,255,0.10)" strokeWidth={4} strokeLinecap="round" />
+        {/* knob cast shadow on the dish surface — projects mostly straight
+            down because the camera is now closer to top-down */}
+        <ellipse cx={pos.x + 2} cy={DISH_CY + 4} rx={KNOB_R * 0.92} ry={KNOB_R * 0.32}
+                 fill="rgba(0,0,0,0.4)" filter="url(#joy-soft)" />
 
-        {/* knob cast shadow */}
-        <ellipse cx={pos.x + 4} cy={pos.y + KNOB_R * 0.9} rx={KNOB_R * 0.95} ry={KNOB_R * 0.35}
-                 fill="rgba(0,0,0,0.45)" filter="url(#joy-soft)" />
+        {/* stick — thick line from dish hinge to knob */}
+        <line x1={DISH_CX} y1={DISH_CY - 1} x2={pos.x} y2={pos.y + KNOB_R * 0.5}
+              stroke="url(#joy-stick)" strokeWidth={15} strokeLinecap="round" />
+        {/* stick highlight (top-left side) */}
+        <line x1={DISH_CX - 3} y1={DISH_CY - 1} x2={pos.x - 3} y2={pos.y + KNOB_R * 0.5}
+              stroke="rgba(255,255,255,0.10)" strokeWidth={4} strokeLinecap="round" />
 
         {/* knob */}
         <circle cx={pos.x} cy={pos.y} r={KNOB_R}

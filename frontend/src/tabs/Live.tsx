@@ -56,7 +56,7 @@ export function Live({ state, liveBuf, tick, apiBase, setThresh, camOn, setCamOn
         { stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border } },
         {
           stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border },
-          size: 60,
+          size: 60, space: 38,
           values: (_u, splits) => splits.map((v) => formatSI(v)),
         },
       ],

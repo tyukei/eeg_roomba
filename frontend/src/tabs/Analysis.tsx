@@ -51,7 +51,7 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
         { stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border } },
         {
           stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border },
-          size: 70,
+          size: 70, space: 38,
           values: (_u, splits) => splits.map((v) => formatSI(v)),
         },
       ],
@@ -80,7 +80,7 @@ export function Analysis({ state, liveBuf, bandsBuf, tick }: AnalysisTabProps) {
         { stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border }, size: 36 },
         {
           stroke: c.muted, grid: { stroke: c.border, width: 1 }, ticks: { stroke: c.border },
-          size: 58,
+          size: 58, space: 38,
           values: (_u, splits) => splits.map((v) => formatSI(v)),
         },
       ],
