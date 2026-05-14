@@ -6,6 +6,8 @@ interface Props {
   liveBuf: React.MutableRefObject<{ ts: number[]; ch: number[][] }>;
   selected?: number[];
   tick: number;     // re-render trigger (parent ticks at 200ms)
+  hovered?: number | null;
+  onHover?: (ch: number | null) => void;
 }
 
 /**
@@ -13,7 +15,7 @@ interface Props {
  * Each cell autoscales independently so a high-amplitude channel doesn't
  * flatten the others. Selected (decision) channels are highlighted.
  */
-export function ChannelGrid({ liveBuf, selected = [], tick }: Props) {
+export function ChannelGrid({ liveBuf, selected = [], tick, hovered, onHover }: Props) {
   const buf = liveBuf.current;
   const selSet = useMemo(() => new Set(selected), [selected]);
 
@@ -22,14 +24,20 @@ export function ChannelGrid({ liveBuf, selected = [], tick }: Props) {
       {Array.from({ length: NCH }, (_, i) => {
         const data = buf.ch[i];
         const isSelected = selSet.has(i);
+        const isHovered = hovered === i;
         const last = data.length ? data[data.length - 1] : null;
         return (
-          <div key={i} className={`ch-cell ${isSelected ? "selected" : ""}`}>
+          <div
+            key={i}
+            className={`ch-cell ${isSelected ? "selected" : ""} ${isHovered ? "hovered" : ""}`}
+            onPointerEnter={() => onHover?.(i)}
+            onPointerLeave={() => onHover?.(null)}
+          >
             <div className="ch-cell-head">
               <span className="ch-cell-name">ch{i}</span>
               <span className="ch-cell-now">{last == null ? "—" : last.toFixed(0)}</span>
             </div>
-            <Sparkline data={data} highlighted={isSelected} tick={tick} />
+            <Sparkline data={data} highlighted={isSelected || isHovered} tick={tick} />
           </div>
         );
       })}

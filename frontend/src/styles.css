@@ -237,6 +237,11 @@ body {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
   background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
 }
+.bg-cell.hovered {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+  box-shadow: 0 0 0 1px var(--accent);
+}
 .bg-cell-head {
   display: flex; justify-content: space-between; align-items: baseline;
   font-size: 11px; margin-bottom: 6px;
@@ -403,6 +408,15 @@ body {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
   background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
 }
+/* Cross-panel hover highlight — driven from any panel (3D brain, heatmap,
+ * sparkline, BandsGrid). Reads as a brighter accent than `.selected` so a
+ * hovered channel pops out even when the decision-ch set already
+ * highlighted it. */
+.ch-cell.hovered {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+  box-shadow: 0 0 0 1px var(--accent);
+}
 .ch-cell-head {
   display: flex; justify-content: space-between; align-items: baseline;
   font-size: 11px;
@@ -562,6 +576,140 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   border-radius: 4px; font-size: 10px; font-weight: 500;
   color: var(--text); background: var(--surface-2);
   border: 1px solid var(--border);
+}
+/* Cross-panel hover highlight for the electrode table row. */
+.electrode-table tr.row-hovered td {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.electrode-table tr {
+  cursor: default;
+}
+
+/* ----- 3D brain panel ----- */
+.brain3d-panel { padding-bottom: 8px; }
+.brain3d-canvas {
+  position: relative;
+  width: 100%;
+  height: 360px;
+  background: radial-gradient(ellipse at center, var(--surface-2) 0%, var(--bg) 80%);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.brain3d-loading {
+  display: grid; place-items: center;
+  height: 360px; color: var(--muted);
+  font-size: 12px;
+}
+.brain3d-tip {
+  position: absolute;
+  bottom: 10px; left: 10px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  display: flex; gap: 10px; align-items: baseline;
+  font-size: 12px;
+  pointer-events: none;
+}
+.brain3d-tip strong { color: var(--accent); }
+.brain3d-tip small { color: var(--muted); font-family: ui-monospace, monospace; }
+
+/* ----- Channel × Band heatmap ----- */
+.bh-wrap { display: flex; flex-direction: column; gap: 8px; }
+.bh-grid {
+  display: grid;
+  grid-template-columns: 64px repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bh-corner { background: var(--surface-2); }
+.bh-colhead {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+  padding: 6px 4px;
+}
+.bh-rowhead {
+  background: var(--surface-2);
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: default;
+}
+.bh-rowhead strong { color: var(--text); }
+.bh-rowhead small { color: var(--muted); font-family: ui-monospace, monospace; font-size: 9.5px; }
+.bh-rowhead.hovered {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-2));
+}
+.bh-cell {
+  min-height: 22px;
+  cursor: default;
+  transition: filter 0.08s;
+}
+.bh-cell.hovered {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  filter: brightness(1.25);
+}
+.bh-legend {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; color: var(--muted);
+}
+.bh-legend-bar {
+  flex: 0 0 120px; height: 8px; border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    hsl(212 25% 30%),
+    hsl(150 45% 45%),
+    hsl(25 75% 60%)
+  );
+}
+
+/* ----- Time × Channel heatmap ----- */
+.tch-wrap { display: flex; gap: 6px; }
+.tch-axis { display: flex; flex-direction: column; min-width: 72px; }
+.tch-row-label {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 6px;
+  font-size: 10.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.tch-row-label strong { color: var(--text); }
+.tch-row-label small { color: var(--muted); font-family: ui-monospace, monospace; font-size: 9.5px; }
+.tch-row-label.hovered {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-2));
+  border-color: var(--accent);
+}
+.tch-grid { flex: 1 1 auto; display: flex; flex-direction: column; }
+.tch-row {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.tch-row.hovered {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.tch-cell { height: 100%; }
+.tch-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.tch-time-legend {
+  margin-top: 4px;
+  display: flex; justify-content: space-between;
+  color: var(--muted); font-size: 10px;
 }
 
 /* Camera */

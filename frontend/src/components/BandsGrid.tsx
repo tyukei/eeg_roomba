@@ -5,6 +5,8 @@ import { AppState, BAND_COLORS, BAND_NAMES, BandName, NCH } from "../types";
 interface Props {
   state: AppState;
   selected?: number[];
+  hovered?: number | null;
+  onHover?: (ch: number | null) => void;
 }
 
 /**
@@ -13,7 +15,7 @@ interface Props {
  * per electrode at a glance. Each card normalises to its own max so one
  * dominant channel doesn't flatten the rest.
  */
-export function BandsGrid({ state, selected = [] }: Props) {
+export function BandsGrid({ state, selected = [], hovered, onHover }: Props) {
   const selSet = new Set(selected);
   return (
     <div className="bands-grid">
@@ -23,9 +25,15 @@ export function BandsGrid({ state, selected = [] }: Props) {
         }));
         const max = Math.max(1, ...values.map((x) => x.v));
         const isSel = selSet.has(ch);
+        const isHovered = hovered === ch;
         const label = MONTAGE[ch]?.name ?? "";
         return (
-          <div key={ch} className={`bg-cell ${isSel ? "selected" : ""}`}>
+          <div
+            key={ch}
+            className={`bg-cell ${isSel ? "selected" : ""} ${isHovered ? "hovered" : ""}`}
+            onPointerEnter={() => onHover?.(ch)}
+            onPointerLeave={() => onHover?.(null)}
+          >
             <div className="bg-cell-head">
               <span className="bg-cell-ch">ch{ch}</span>
               <span className="bg-cell-electrode">{label}</span>
