@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -178,9 +179,19 @@ async def proxy_control(cmd: str) -> dict[str, Any]:
     try:
         r = await app.state.http.post(f"{ROOMBA_BASE}/command/{cmd}", timeout=2.0)
         r.raise_for_status()
-        return {"ok": True, "cmd": cmd}
     except httpx.HTTPError as e:
+        app.state.mq.publish(
+            "roomba/cmd",
+            json.dumps({"cmd": cmd, "ts": time.time(), "ok": False, "err": str(e), "src": "manual"}),
+            qos=1,
+        )
         raise HTTPException(status_code=502, detail=str(e)) from e
+    app.state.mq.publish(
+        "roomba/cmd",
+        json.dumps({"cmd": cmd, "ts": time.time(), "ok": True, "src": "manual"}),
+        qos=1,
+    )
+    return {"ok": True, "cmd": cmd}
 
 
 @app.post("/camera/start")
