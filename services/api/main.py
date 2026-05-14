@@ -7,6 +7,7 @@ import binascii
 import json
 import logging
 import os
+import re
 import time
 from contextlib import asynccontextmanager
 from typing import Any
@@ -69,6 +70,9 @@ async def lifespan(app: FastAPI):
         "last_reason": None,
         "last_error": None,
         "decisions": [],  # list[{ts, command, reason, ok}]
+        # Guards concurrent /autopilot/start and /stop so two racers can't both
+        # claim the loop or both leave a dangling task.
+        "lock": asyncio.Lock(),
     }
 
     loop = asyncio.get_running_loop()
@@ -91,9 +95,22 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         ap = app.state.autopilot
-        if ap.get("task") and not ap["task"].done():
+        task = ap.get("task")
+        if task and not task.done():
+            # Ask the loop to exit cleanly first; its finally block sends one
+            # last "stop" while http is still open. If it doesn't exit in 5s
+            # (stuck in a Gemini call etc.), cancel and move on.
             ap["running"] = False
-            ap["task"].cancel()
+            try:
+                await asyncio.wait_for(task, timeout=5.0)
+            except asyncio.TimeoutError:
+                task.cancel()
+                try:
+                    await asyncio.wait_for(task, timeout=2.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
+            except asyncio.CancelledError:
+                pass
         mq.loop_stop()
         await app.state.http.aclose()
         await app.state.pool.close()
@@ -351,7 +368,8 @@ async def _grab_jpeg_frame() -> bytes | None:
         return None
 
     buf = bytearray()
-    try:
+
+    async def _read_one() -> bytes | None:
         async for chunk in upstream.aiter_raw():
             buf.extend(chunk)
             if len(buf) > AUTOPILOT_FRAME_MAX_BYTES * 2:
@@ -376,6 +394,15 @@ async def _grab_jpeg_frame() -> bytes | None:
             if len(buf) < body_start + length:
                 continue
             return bytes(buf[body_start : body_start + length])
+        return None
+
+    try:
+        # Per-iteration deadline: httpx's connect/read timeouts don't cover the
+        # async iteration over a streaming body, so a slow-trickling or stalled
+        # upstream could hang the autopilot tick. wait_for() bounds the whole pull.
+        return await asyncio.wait_for(_read_one(), timeout=AUTOPILOT_FRAME_TIMEOUT)
+    except (asyncio.TimeoutError, httpx.HTTPError) as e:
+        log.warning("autopilot frame read aborted: %s", e)
         return None
     finally:
         await upstream.aclose()
@@ -410,10 +437,11 @@ def _parse_autopilot_response(text: str) -> tuple[str | None, str]:
             return cmd, reason
     except (json.JSONDecodeError, AttributeError, TypeError):
         pass
-    # Fallback: keyword search.
+    # Fallback: keyword search with word-boundary so e.g. "background" doesn't
+    # match "back".
     low = text.lower()
     for cand in ("forward", "back", "left", "right", "stop"):
-        if cand in low:
+        if re.search(rf"\b{cand}\b", low):
             return cand, text[:120].strip()
     return None, ""
 
@@ -458,18 +486,18 @@ async def _autopilot_loop() -> None:
                     ),
                 ]
                 # Mirror the bash example: thinking=LOW + googleSearch tool.
-                # googleSearch can ground odd navigation prompts; LOW keeps
-                # latency reasonable for a ~3s cadence.
+                # LOW keeps latency reasonable for a ~3s cadence. If a future
+                # SDK rename drops these symbols we log once and fall back to
+                # a plain config rather than silently dropping the features.
                 config_kwargs: dict[str, Any] = {"temperature": 0.3}
                 try:
                     config_kwargs["thinking_config"] = gtypes.ThinkingConfig(thinking_level="LOW")
-                except (AttributeError, TypeError):
-                    # Older SDK without ThinkingConfig — skip silently.
-                    pass
+                except (AttributeError, TypeError) as e:
+                    log.warning("autopilot: ThinkingConfig unavailable (%s); disabling", e)
                 try:
                     config_kwargs["tools"] = [gtypes.Tool(google_search=gtypes.GoogleSearch())]
-                except (AttributeError, TypeError):
-                    pass
+                except (AttributeError, TypeError) as e:
+                    log.warning("autopilot: googleSearch tool unavailable (%s); disabling", e)
 
                 resp = await client.aio.models.generate_content(
                     model=model,
@@ -509,8 +537,6 @@ async def autopilot_start(body: dict[str, Any] | None = None) -> dict[str, Any]:
     if app.state.genai is None:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not set on the api service")
     ap = app.state.autopilot
-    if ap["running"]:
-        return {"status": "already_running", "config": ap["config"]}
 
     body = body or {}
     try:
@@ -524,35 +550,52 @@ async def autopilot_start(body: dict[str, Any] | None = None) -> dict[str, Any]:
     goal = str(body.get("goal") or "")[:200]
     model = str(body.get("model") or GEMINI_ROBOTICS_MODEL)[:80]
 
-    # Make sure the camera is actually streaming — autopilot needs frames.
-    try:
-        await app.state.http.post(f"{ROOMBA_BASE}/camera/start", timeout=5.0)
-    except httpx.HTTPError:
-        # Non-fatal: the loop will surface a "no camera frame" error if needed.
-        pass
+    # Lock-guard: two concurrent /autopilot/start POSTs both pass the
+    # `running` check before either flips it, so without the lock both
+    # would launch a loop and the second would orphan the first task.
+    async with ap["lock"]:
+        if ap["running"]:
+            return {"status": "already_running", "config": ap["config"]}
 
-    ap["config"] = {"interval": interval, "mode": mode, "goal": goal, "model": model}
-    ap["last_command"] = None
-    ap["last_reason"] = None
-    ap["last_error"] = None
-    ap["decisions"] = []
-    ap["running"] = True
-    ap["task"] = asyncio.create_task(_autopilot_loop())
-    return {"status": "started", "config": ap["config"]}
+        # Make sure the camera is actually streaming — autopilot needs frames.
+        try:
+            await app.state.http.post(f"{ROOMBA_BASE}/camera/start", timeout=5.0)
+        except httpx.HTTPError:
+            # Non-fatal: the loop will surface a "no camera frame" error if needed.
+            pass
+
+        ap["config"] = {"interval": interval, "mode": mode, "goal": goal, "model": model}
+        ap["last_command"] = None
+        ap["last_reason"] = None
+        ap["last_error"] = None
+        ap["decisions"] = []
+        ap["running"] = True
+        ap["task"] = asyncio.create_task(_autopilot_loop())
+        return {"status": "started", "config": ap["config"]}
 
 
 @app.post("/autopilot/stop")
 async def autopilot_stop() -> dict[str, Any]:
     ap = app.state.autopilot
-    if not ap["running"]:
-        return {"status": "not_running"}
-    ap["running"] = False
-    task = ap.get("task")
+    async with ap["lock"]:
+        if not ap["running"]:
+            return {"status": "not_running"}
+        ap["running"] = False
+        task = ap.get("task")
+    # The await happens outside the lock so /status calls don't queue behind
+    # a slow Gemini iteration cooling down.
     if task and not task.done():
-        task.cancel()
+        # Prefer cooperative exit; the loop checks ap["running"] each tick
+        # and its finally sends one last "stop". Cancel only if it's stuck.
         try:
             await asyncio.wait_for(task, timeout=5.0)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except asyncio.TimeoutError:
+            task.cancel()
+            try:
+                await asyncio.wait_for(task, timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+        except asyncio.CancelledError:
             pass
     ap["task"] = None
     return {"status": "stopped"}

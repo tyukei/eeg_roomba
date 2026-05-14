@@ -680,6 +680,11 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   font: inherit;
 }
 .autopilot-row input[type="number"] { max-width: 80px; flex: 0 0 auto; }
+.autopilot-row select:disabled,
+.autopilot-row input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 .autopilot-actions { display: flex; gap: 6px; margin-top: 4px; }
 .autopilot-last {
   margin-top: 12px;

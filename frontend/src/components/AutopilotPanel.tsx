@@ -105,13 +105,17 @@ export function AutopilotPanel({ apiBase }: AutopilotPanelProps) {
     <div className="panel autopilot-panel">
       <div className="panel-head">
         <h2>Autopilot</h2>
-        <span className={`pill ${status.running ? "ok" : "muted"}`}>
+        <span
+          className={`pill ${status.running ? "ok" : "muted"}`}
+          role="status"
+          aria-live="polite"
+        >
           {status.running ? "running" : "stopped"}
         </span>
       </div>
 
       {!status.model_available && (
-        <div className="analyze-err" style={{ marginBottom: 8 }}>
+        <div className="analyze-err" style={{ marginBottom: 8 }} role="alert">
           GEMINI_API_KEY not set on api service — autopilot disabled.
         </div>
       )}
@@ -182,9 +186,13 @@ export function AutopilotPanel({ apiBase }: AutopilotPanelProps) {
         </div>
       </div>
 
-      {err && <div className="analyze-err" style={{ marginTop: 8 }}>{err}</div>}
+      {err && (
+        <div className="analyze-err" style={{ marginTop: 8 }} role="alert" aria-live="assertive">{err}</div>
+      )}
       {status.last_error && !err && (
-        <div className="analyze-err" style={{ marginTop: 8 }}>{status.last_error}</div>
+        <div className="analyze-err" style={{ marginTop: 8 }} role="status" aria-live="polite">
+          {status.last_error}
+        </div>
       )}
 
       {(lastCmd || lastReason) && (
