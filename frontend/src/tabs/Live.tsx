@@ -1,16 +1,25 @@
+import { lazy, Suspense } from "react";
+
 import { ChannelGrid } from "../components/ChannelGrid";
+import { HeartRate } from "../components/HeartRate";
+import { MindState } from "../components/MindState";
 import { Slider } from "../components/Slider";
 import { formatSI } from "../format";
-import { AppState, Threshold } from "../types";
+import { AppState, BandName, Threshold } from "../types";
+
+// three.js lives in its own chunk via BrainParticles3D already; reuse the
+// same lazy boundary for MindTrajectory3D so the initial bundle stays slim.
+const MindTrajectory3D = lazy(() => import("../components/MindTrajectory3D"));
 
 export interface LiveTabProps {
   state: AppState;
   liveBuf: React.MutableRefObject<{ ts: number[]; ch: number[][] }>;
+  bandsBuf: React.MutableRefObject<{ ts: number[]; bands: Record<BandName, number[][]> }>;
   tick: number;            // 200ms force-render counter, just to trigger re-render
   setThresh: (patch: Partial<Threshold>) => void;
 }
 
-export function Live({ state, liveBuf, tick, setThresh }: LiveTabProps) {
+export function Live({ state, liveBuf, bandsBuf, tick, setThresh }: LiveTabProps) {
   const buf = liveBuf.current;
   const selectedChs = state.threshold.channels;
 
@@ -37,6 +46,20 @@ export function Live({ state, liveBuf, tick, setThresh }: LiveTabProps) {
           <div className="decision-hero-state">{state.decisionState.toUpperCase()}</div>
           <div className="decision-hero-sub">{decisionLine}</div>
         </div>
+
+        <div className="panel-head" style={{ marginTop: 16 }}>
+          <h2>Mind state</h2>
+          <small>集中 vs リラックス · 直近60秒の推移</small>
+        </div>
+        <MindState state={state} bandsBuf={bandsBuf} tick={tick} />
+
+        <div className="panel-head" style={{ marginTop: 16 }}>
+          <h2>Mind space · 3D trajectory</h2>
+          <small>focus × relax × time の軌跡 · ドラッグで回転</small>
+        </div>
+        <Suspense fallback={<div className="mind3d-loading">3D loading…</div>}>
+          <MindTrajectory3D bandsBuf={bandsBuf} tick={tick} />
+        </Suspense>
 
         <div className="panel-head" style={{ marginTop: 16 }}>
           <h2>EEG live (16ch)</h2>
@@ -70,6 +93,14 @@ export function Live({ state, liveBuf, tick, setThresh }: LiveTabProps) {
       </div>
 
       <div className="side">
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Heart rate</h2>
+            <small>EEG-derived</small>
+          </div>
+          <HeartRate liveBuf={liveBuf} tick={tick} />
+        </div>
+
         <div className="panel">
           <div className="panel-head">
             <h2>Thresholds</h2>

@@ -447,6 +447,222 @@ body {
   text-shadow: 0 0 18px color-mix(in srgb, var(--ok) 55%, transparent);
 }
 
+/* ----- Mind state panel (Live tab) ----- */
+/* Two-up gauges + 60s timeline showing focus vs relax indices, so the
+ * user can read their current cognitive state at a glance and trace how
+ * it has evolved over the last minute. */
+.mind-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color .25s, background .25s, box-shadow .25s;
+}
+.mind-panel.mind-focused {
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--border));
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--warn) 14%, var(--surface-2)) 0%,
+    var(--surface-2) 80%);
+}
+.mind-panel.mind-relaxed {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 14%, var(--surface-2)) 0%,
+    var(--surface-2) 80%);
+}
+.mind-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+.mind-status-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 130px;
+}
+.mind-status-label {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text);
+  line-height: 1.1;
+}
+.mind-panel.mind-focused .mind-status-label { color: var(--warn); }
+.mind-panel.mind-relaxed .mind-status-label { color: var(--accent); }
+.mind-status-hint {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.mind-gauges {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.mind-gauge {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.mind-gauge-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 4px;
+}
+.mind-gauge-head strong {
+  font-size: 11px; font-weight: 500;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text);
+}
+.mind-gauge-head small {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px; color: var(--muted);
+}
+.mind-gauge-bar {
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mind-gauge-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .25s ease-out;
+}
+.mind-gauge-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  margin-top: 4px;
+  text-align: right;
+  font-weight: 600;
+}
+.mind-timeline {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.mind-timeline-svg {
+  width: 100%;
+  height: 120px;
+  background: var(--surface);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+.mind-timeline-empty {
+  height: 60px;
+  background: var(--surface);
+  border-radius: 4px;
+  border: 1px dashed var(--border);
+  display: grid; place-items: center;
+  color: var(--muted);
+}
+.mind-timeline-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.mind-legend-item {
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.mind-legend-swatch {
+  display: inline-block;
+  width: 12px; height: 3px;
+  border-radius: 2px;
+}
+.mind-legend-meta { margin-left: auto; font-size: 10.5px; }
+
+@media (max-width: 720px) {
+  .mind-head { grid-template-columns: 1fr; }
+  .mind-status-badge { flex-direction: row; align-items: baseline; gap: 8px; }
+}
+
+/* ----- 3D mind-space trajectory (Live tab) ----- */
+.mind3d-canvas {
+  width: 100%;
+  height: 320px;
+  background: radial-gradient(ellipse at center, var(--surface-2) 0%, var(--bg) 80%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: grab;
+}
+.mind3d-canvas:active { cursor: grabbing; }
+.mind3d-loading {
+  display: grid; place-items: center;
+  height: 320px; color: var(--muted);
+  font-size: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* ----- Heart-rate widget (Live tab side panel) ----- */
+.hr-widget {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.hr-head {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.hr-label {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.hr-conf {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  border: 1px solid var(--border);
+}
+.hr-conf-low  { color: var(--muted); }
+.hr-conf-ok   {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
+}
+.hr-conf-good {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 45%, var(--border));
+}
+.hr-body {
+  display: flex; flex-direction: column; gap: 4px;
+  align-items: stretch;
+}
+.hr-value {
+  display: flex; align-items: baseline; gap: 6px;
+  color: var(--bad);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.hr-value strong {
+  font-size: 32px; font-weight: 700; line-height: 1;
+}
+.hr-value span { font-size: 12px; color: var(--muted); }
+.hr-value small { font-size: 12px; color: var(--muted); }
+.hr-spark {
+  width: 100%;
+  height: 56px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+.hr-spark-empty {
+  background: var(--surface-2);
+  border-radius: 4px;
+  border: 1px dashed var(--border);
+}
+.hr-caveat {
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 /* 16-channel sparkline grid (Live tab) */
 .ch-grid {
   display: grid;
@@ -691,7 +907,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .bh-grid {
   display: grid;
   grid-template-columns: 64px repeat(5, minmax(0, 1fr));
-  gap: 1px;
+  /* No inter-cell gap — cells butt up against each other so adjacent
+   * values read as a continuous gradient rather than tiled chips. The
+   * row-head column is visually separated by its own surface color. */
+  gap: 0;
   background: var(--border);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -722,7 +941,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .bh-cell {
   min-height: 22px;
   cursor: default;
-  transition: filter 0.08s;
+  transition: filter 0.08s, background 0.25s ease-out;
+  /* Sub-pixel blur softens the boundary between adjacent cells so the
+   * matrix reads as a continuous field rather than 80 discrete tiles. */
+  filter: blur(0.5px);
 }
 .bh-cell.hovered {
   outline: 1px solid var(--accent);
@@ -737,9 +959,11 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   flex: 0 0 120px; height: 8px; border-radius: 2px;
   background: linear-gradient(
     to right,
-    hsl(212 25% 38%),
-    hsl(150 45% 50%),
-    hsl(25 75% 62%)
+    rgb(68, 1, 84) 0%,
+    rgb(59, 82, 139) 25%,
+    rgb(33, 144, 141) 50%,
+    rgb(94, 201, 98) 75%,
+    rgb(253, 231, 37) 100%
   );
 }
 .bh-empty {
@@ -783,6 +1007,11 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   z-index: 1;
 }
 .tch-cell { height: 100%; }
+/* Soften column-to-column transitions in the spectrogram so the time
+ * series reads as a continuous field. Applied at the row level so the
+ * blur doesn't accumulate per-cell. */
+.tch-row { filter: blur(0.5px); }
+.tch-row.hovered { filter: none; }
 .tch-empty {
   padding: 20px;
   text-align: center;
