@@ -2,16 +2,7 @@ import { useMemo, useState } from "react";
 import uPlot from "uplot";
 
 import { AutoChart } from "../components/AutoChart";
-
-// Force a log-axis to show only powers of ten — uPlot otherwise emits a tick
-// for every minor (2,3,…,9) which makes Y labels overlap on a tall axis.
-const decadeSplits = (_u: uPlot, _idx: number, lo: number, hi: number): number[] => {
-  const out: number[] = [];
-  let v = Math.pow(10, Math.floor(Math.log10(Math.max(1, lo))));
-  let guard = 0;
-  while (v <= hi * 1.0001 && guard++ < 40) { out.push(v); v *= 10; }
-  return out.length ? out : [1];
-};
+import { BandsGrid } from "../components/BandsGrid";
 import { BrainSvg } from "../components/BrainSvg";
 import { CorrelationMatrix } from "../components/CorrelationMatrix";
 import { corrMatrix, welch } from "../fft";
@@ -22,6 +13,16 @@ import {
   AppState, BAND_COLORS, BAND_NAMES, BAND_RANGES, BandName,
   LIVE_HZ, NCH,
 } from "../types";
+
+// Force a log-axis to show only powers of ten — uPlot otherwise emits a tick
+// for every minor (2,3,…,9) which makes Y labels overlap on a tall axis.
+const decadeSplits = (_u: uPlot, _idx: number, lo: number, hi: number): number[] => {
+  const out: number[] = [];
+  let v = Math.pow(10, Math.floor(Math.log10(Math.max(1, lo))));
+  let guard = 0;
+  while (v <= hi * 1.0001 && guard++ < 40) { out.push(v); v *= 10; }
+  return out.length ? out : [1];
+};
 
 export interface PiEEGTabProps {
   state: AppState;
@@ -214,6 +215,14 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick }: PiEEGTabProps) {
           <small>Pearson r · ±1 = synced</small>
         </div>
         <CorrelationMatrix matrix={corr} selected={state.threshold.channels} />
+      </div>
+
+      <div className="panel full">
+        <div className="panel-head">
+          <h2>Per-channel bands</h2>
+          <small>each ch normalised independently · δ θ α β γ from left</small>
+        </div>
+        <BandsGrid state={state} selected={state.threshold.channels} />
       </div>
 
       <div className="panel full cog-panel">
