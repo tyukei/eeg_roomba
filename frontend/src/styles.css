@@ -646,6 +646,78 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   font-size: 10px; font-weight: 500;
   background: var(--surface-2); color: var(--text);
 }
+.cmd-tag.bad {
+  background: color-mix(in srgb, var(--bad) 22%, var(--surface-2));
+  color: var(--bad);
+}
+
+/* Autopilot panel (Roomba tab side column) */
+.autopilot-panel .pill.muted {
+  background: var(--surface-2); color: var(--muted);
+}
+.autopilot-form {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 4px;
+}
+.autopilot-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--muted);
+}
+.autopilot-row > span:first-child {
+  width: 60px; flex-shrink: 0;
+  font-size: 11px; letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.autopilot-row select,
+.autopilot-row input[type="text"],
+.autopilot-row input[type="number"] {
+  flex: 1; min-width: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font: inherit;
+}
+.autopilot-row input[type="number"] { max-width: 80px; flex: 0 0 auto; }
+.autopilot-actions { display: flex; gap: 6px; margin-top: 4px; }
+.autopilot-last {
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+}
+.autopilot-last-head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+}
+.autopilot-last-reason {
+  font-size: 12px; line-height: 1.5; color: var(--text);
+  word-break: break-word;
+}
+.autopilot-history { margin-top: 10px; font-size: 11px; }
+.autopilot-history summary {
+  cursor: pointer; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em; font-size: 10px;
+}
+.autopilot-history ul {
+  list-style: none; padding: 0; margin: 6px 0 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.autopilot-history li {
+  display: grid;
+  grid-template-columns: 64px auto 1fr;
+  gap: 6px; align-items: baseline;
+}
+.autopilot-history-ts {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--muted); font-size: 10px;
+}
+.autopilot-history-reason {
+  color: var(--text); line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
 
 small { color: var(--muted); }
 

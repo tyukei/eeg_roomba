@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { AutopilotPanel } from "../components/AutopilotPanel";
 import { Joystick } from "../components/Joystick";
 import { AppState, TrajectoryStep } from "../types";
 
@@ -120,6 +121,8 @@ export function Roomba({ state, history, apiBase, camOn, setCamOn }: RoombaTabPr
           <div className="panel-head"><h2>Control</h2><small>arrows / space</small></div>
           <Joystick onCmd={cmd} />
         </div>
+
+        <AutopilotPanel apiBase={apiBase} />
       </div>
 
       <div className="panel traj-map-panel">
