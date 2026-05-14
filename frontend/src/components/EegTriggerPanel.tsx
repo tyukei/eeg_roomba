@@ -42,6 +42,10 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
   const [goalDraft, setGoalDraft] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Autopilot run status (polled alongside the trigger). Used so the test
+  // button can flip to "stop" while a run is live without us having to wire
+  // a second WebSocket topic.
+  const [autopilotRunning, setAutopilotRunning] = useState(false);
 
   // Stash the latest `enabled` so the polling effect can read it without
   // depending on `cfg.enabled` directly (which would re-create the interval
@@ -58,10 +62,14 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
     let id: ReturnType<typeof setTimeout>;
     const pull = async () => {
       try {
-        const r = await fetch(`${apiBase}/eeg-trigger`);
-        if (!r.ok) throw new Error(`status ${r.status}`);
-        const j: TriggerConfig = await r.json();
-        if (!cancelled) setCfg(j);
+        const [tr, ar] = await Promise.all([
+          fetch(`${apiBase}/eeg-trigger`).then((r) => r.ok ? r.json() : Promise.reject(r.status)),
+          fetch(`${apiBase}/autopilot/status`).then((r) => r.ok ? r.json() : null),
+        ]);
+        if (!cancelled) {
+          setCfg(tr as TriggerConfig);
+          if (ar && typeof ar.running === "boolean") setAutopilotRunning(ar.running);
+        }
       } catch {
         /* transient */
       } finally {
@@ -108,6 +116,50 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
     }
   };
 
+  // Test fire: manually launch the autopilot as if α had crossed the
+  // threshold, using the current trigger config. Same `src="eeg"` stamp as
+  // a real α fire, so the OFF toggle (and the autopilot's own stop button)
+  // can tear it down. If autopilot is already running, the button becomes a
+  // stop shortcut.
+  const testFireOrStop = async () => {
+    setSubmitting(true);
+    setErr(null);
+    try {
+      // If the user typed a fresh goal but never blurred, persist it first
+      // so the test run uses the on-screen text, not the stale server value.
+      if (!autopilotRunning && goalDraft !== null && goalDraft !== cfg.goal) {
+        await fetch(`${apiBase}/eeg-trigger`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ goal: goalDraft }),
+        });
+        setGoalDraft(null);
+      }
+      const url = autopilotRunning ? `${apiBase}/autopilot/stop` : `${apiBase}/eeg-trigger/test-fire`;
+      const r = await fetch(url, { method: "POST" });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(t || `HTTP ${r.status}`);
+      }
+      // Set the new running state from the server's response, not from our
+      // optimistic guess. A double-click could otherwise flip us back to
+      // "stop" when the server actually returned already_running.
+      let nextRunning = !autopilotRunning;
+      try {
+        const body = await r.json();
+        if (typeof body?.status === "string") {
+          nextRunning =
+            body.status === "started" || body.status === "already_running";
+        }
+      } catch { /* response wasn't JSON; fall back to optimistic flip */ }
+      setAutopilotRunning(nextRunning);
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Three visual states for safety: OFF (idle) / ARMED (waiting for α) /
   // FIRING (α-active, autopilot launched). "armed" must read distinctly
   // from "off" — the robot may move at any moment.
@@ -124,6 +176,13 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
   }
 
   const goalValue = goalDraft ?? cfg.goal;
+  // Goal mode without an actual goal is a misconfiguration — disable fire so
+  // the user can't accidentally start a run that immediately stops on
+  // "(empty goal)". Stop is always allowed even with an empty goal.
+  const fireDisabled =
+    !autopilotRunning &&
+    cfg.mode === "goal" &&
+    !(goalValue || "").trim();
 
   return (
     <div className="panel eeg-trigger-panel">
@@ -202,6 +261,22 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
               ))}
             </select>
           </label>
+
+          <button
+            type="button"
+            className={`btn small ${autopilotRunning ? "stop" : ""}`}
+            disabled={submitting || !cfg.model_available || fireDisabled}
+            onClick={testFireOrStop}
+            title={
+              autopilotRunning
+                ? "Stop the currently running autopilot."
+                : fireDisabled
+                ? "Set a goal first — goal-mode autopilot needs a target."
+                : "Fire the autopilot now with the current goal — useful for testing without actually triggering α."
+            }
+          >
+            {autopilotRunning ? "stop" : "test fire"}
+          </button>
         </div>
 
         <div className="eeg-trigger-state">
