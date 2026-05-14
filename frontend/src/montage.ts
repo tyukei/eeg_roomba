@@ -15,6 +15,11 @@ export interface Electrode {
   name: string;    // 10-20 label
   x: number;       // -1..+1 (right positive)
   y: number;       // -1..+1 (front positive)
+  /** Approximate 3D position on a unit sphere (right, up, forward).
+   *  We lift the 10-20 (x, y) into the upper hemisphere with
+   *  z = +sqrt(1 - x² - y²), so the electrodes sit on a half-dome rather
+   *  than flat — good enough for a particle-brain visualisation. */
+  pos3: [number, number, number];
   region: "frontal" | "central" | "parietal" | "occipital" | "temporal";
 }
 
@@ -41,9 +46,23 @@ const DEFAULT_LABELS: string[] = [
   "F7", "F8", "T7", "T8", "P7", "P8", "P3", "P4",            // chip B
 ];
 
+// Three.js convention: x = right, y = up (toward top-of-head), z = forward (toward nose).
+// Our 2D montage already has +y = nose, so we map montage-y → three-z and
+// derive height (three-y) from the spherical projection. r=1.0 places points
+// exactly on the unit sphere; we use 1.05 so they hover just above the
+// particle brain surface and stay clickable.
+const SPHERE_RADIUS = 1.05;
+function lift3D(x: number, y: number): [number, number, number] {
+  // y here is the montage's "front" axis. Treat (x, y) as horizontal,
+  // height from the upper hemisphere.
+  const planar = Math.min(1, x * x + y * y);
+  const up = Math.sqrt(Math.max(0, 1 - planar));
+  return [x * SPHERE_RADIUS, up * SPHERE_RADIUS, y * SPHERE_RADIUS];
+}
+
 export const MONTAGE: Electrode[] = DEFAULT_LABELS.map((name, ch) => {
   const [x, y] = POS[name as keyof typeof POS];
-  return { ch, name, x, y, region: REGION[name] };
+  return { ch, name, x, y, pos3: lift3D(x, y), region: REGION[name] };
 });
 
 // Monochrome — anterior (front) darker, posterior lighter. Hue tied to brand accent.

@@ -1,12 +1,15 @@
-import { useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import uPlot from "uplot";
 
 import { AnalyzePanel } from "../components/AnalyzePanel";
 import { AutoChart } from "../components/AutoChart";
+import { BandHeatmap } from "../components/BandHeatmap";
 import { BandsGrid } from "../components/BandsGrid";
 import { BrainSvg } from "../components/BrainSvg";
 import { ChannelGrid } from "../components/ChannelGrid";
 import { CorrelationMatrix } from "../components/CorrelationMatrix";
+import { ErrorBoundary } from "../components/ErrorBoundary";
+import { TimeChannelHeatmap } from "../components/TimeChannelHeatmap";
 import { corrMatrix, welch } from "../fft";
 import { formatSI } from "../format";
 import { MONTAGE } from "../montage";
@@ -15,6 +18,10 @@ import {
   AppState, BAND_COLORS, BAND_NAMES, BAND_RANGES, BandName,
   LIVE_HZ, NCH,
 } from "../types";
+
+// three.js is ~500KB minified; defer it until the user opens the PiEEG tab
+// so the initial bundle stays lean for the Live/Roomba tabs.
+const BrainParticles3D = lazy(() => import("../components/BrainParticles3D"));
 
 // Force a log-axis to show only powers of ten — uPlot otherwise emits a tick
 // for every minor (2,3,…,9) which makes Y labels overlap on a tall axis.
@@ -39,6 +46,10 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
   const [ch, setCh] = useState(6);
   const [band, setBand] = useState<BandName>("alpha");
   const [scale, setScale] = useState<"linear" | "log">("log");
+  // Channel under the user's pointer in *any* panel (3D brain, heatmap,
+  // sparkline grid, …). Lifted here so hovering one panel highlights the
+  // same channel everywhere — turns the dashboard into a single linked view.
+  const [hoveredCh, setHoveredCh] = useState<number | null>(null);
 
   const lb = liveBuf.current;
   const bb = bandsBuf.current;
@@ -158,7 +169,12 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
             </thead>
             <tbody>
               {MONTAGE.map((e) => (
-                <tr key={e.ch}>
+                <tr
+                  key={e.ch}
+                  className={hoveredCh === e.ch ? "row-hovered" : ""}
+                  onPointerEnter={() => setHoveredCh(e.ch)}
+                  onPointerLeave={() => setHoveredCh(null)}
+                >
                   <td><strong>ch{e.ch}</strong></td>
                   <td>{e.name}</td>
                   <td><span className="region-chip">{e.region}</span></td>
@@ -169,6 +185,7 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
           </table>
         </div>
       </div>
+
 
       <div className="panel" style={{ gridColumn: "2 / span 2", gridRow: 1 }} data-panel="Band power 60s">
         <div className="panel-head">
@@ -214,12 +231,41 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
         </div>
       </div>
 
+      <div className="panel full brain3d-panel" data-panel="3D Brain">
+        <div className="panel-head">
+          <h2>3D Brain · {band}</h2>
+          <small>drag to rotate · auto-spins · hover an electrode to light it up everywhere</small>
+        </div>
+        <ErrorBoundary
+          fallback={(err) => (
+            <div className="brain3d-loading">3D brain failed to load: {err.message}</div>
+          )}
+        >
+          <Suspense fallback={<div className="brain3d-loading">loading 3D brain…</div>}>
+            <BrainParticles3D
+              values={topoValues}
+              band={band}
+              selected={state.threshold.channels}
+              hovered={hoveredCh}
+              onHover={setHoveredCh}
+              onSelect={(c) => setCh(c)}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      </div>
+
       <div className="panel full" data-panel="EEG live">
         <div className="panel-head">
           <h2>EEG live (16ch)</h2>
-          <small>10s window · each ch auto-scaled · decision chs accented</small>
+          <small>10s window · each ch auto-scaled · decision chs accented · hover to highlight everywhere</small>
         </div>
-        <ChannelGrid liveBuf={liveBuf} selected={state.threshold.channels} tick={tick} />
+        <ChannelGrid
+          liveBuf={liveBuf}
+          selected={state.threshold.channels}
+          tick={tick}
+          hovered={hoveredCh}
+          onHover={setHoveredCh}
+        />
       </div>
 
       <div className="panel full" data-panel="Per-channel bands">
@@ -227,7 +273,34 @@ export function PiEEG({ state, liveBuf, bandsBuf, tick, apiBase }: PiEEGTabProps
           <h2>Per-channel bands</h2>
           <small>each ch normalised independently · δ θ α β γ from left</small>
         </div>
-        <BandsGrid state={state} selected={state.threshold.channels} />
+        <BandsGrid
+          state={state}
+          selected={state.threshold.channels}
+          hovered={hoveredCh}
+          onHover={setHoveredCh}
+        />
+      </div>
+
+      <div className="panel full" data-panel="Channel × Band heatmap">
+        <div className="panel-head">
+          <h2>Channel × Band heatmap</h2>
+          <small>per-band normalised · 16 rows × 5 cols · color = relative power</small>
+        </div>
+        <BandHeatmap state={state} hovered={hoveredCh} onHover={setHoveredCh} />
+      </div>
+
+      <div className="panel full" data-panel="Time × Channel heatmap">
+        <div className="panel-head">
+          <h2>Time × Channel · {band}</h2>
+          <small>60s history of the selected band across all channels · newest on the right</small>
+        </div>
+        <TimeChannelHeatmap
+          bandsBuf={bandsBuf}
+          band={band}
+          tick={tick}
+          hovered={hoveredCh}
+          onHover={setHoveredCh}
+        />
       </div>
       </div>
 
