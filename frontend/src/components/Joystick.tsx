@@ -103,7 +103,12 @@ export function Joystick({ onCmd }: { onCmd: (c: Dir) => Promise<void> | void })
     const cx = r.left + r.width / 2;                          // viewBox x=0 ↔ horizontal center
     const cy = r.top  + (-REST_Y - VB.y) * pxPerUnit;          // viewBox y=REST_Y ↔ rest screen y
     ptrRef.current = { id: e.pointerId, cx, cy, pxPerUnit };
-    (e.target as SVGElement).setPointerCapture?.(e.pointerId);
+    // Capture on the SVG root so we keep getting events even if a child
+    // re-renders or sets pointer-events:none mid-drag.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    // Reset send-state so a drag right after a keyboard press still emits
+    // the first command rather than swallowing it as a duplicate.
+    lastSentRef.current = "stop";
     setDragging(true);
     updateFromClient(e.clientX, e.clientY);
   };
@@ -115,7 +120,7 @@ export function Joystick({ onCmd }: { onCmd: (c: Dir) => Promise<void> | void })
 
   const release = (e: React.PointerEvent<SVGElement>) => {
     if (!ptrRef.current || ptrRef.current.id !== e.pointerId) return;
-    (e.target as SVGElement).releasePointerCapture?.(e.pointerId);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
     ptrRef.current = null;
     setDragging(false);
     setPos({ x: 0, y: REST_Y });
@@ -156,6 +161,7 @@ export function Joystick({ onCmd }: { onCmd: (c: Dir) => Promise<void> | void })
   return (
     <div className="joy" ref={wrapRef}>
       <svg viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`}
+           preserveAspectRatio="xMidYMid meet"
            className="joy-svg"
            onPointerDown={onPointerDown}
            onPointerMove={onPointerMove}
@@ -226,7 +232,7 @@ export function Joystick({ onCmd }: { onCmd: (c: Dir) => Promise<void> | void })
       </svg>
 
       <div className="joy-readout">
-        <span className={`joy-tag ${tiltActive ? "on" : ""}`}>{dir}</span>
+        <span className={`joy-tag ${tiltActive ? "on" : ""}`}>{tiltActive ? dir : "idle"}</span>
         <small>drag the stick · or arrows / space</small>
       </div>
     </div>
