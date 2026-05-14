@@ -1,0 +1,22 @@
+[Unit]
+Description=Roomba FastAPI Controller (Arduino serial bridge + USB camera)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=dialout
+WorkingDirectory=/home/pi/Documents/eeg_roomba/pi_b_roomba_addon/roomba_arduino_client
+ExecStart=/home/pi/Documents/eeg_roomba/pi_b_roomba_addon/roomba_arduino_client/.venv/bin/python roomba_api.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+# GEMINI_API_KEY is only needed if you also enable the (now-deprecated)
+# on-device /autopilot/* endpoints. The eeg_roomba PC orchestrator drives
+# autopilot itself and only uses /command/{cmd} + /camera/stream from this
+# service, so this can be left empty in normal eeg_roomba deployments.
+Environment=GEMINI_API_KEY=
+
+[Install]
+WantedBy=multi-user.target

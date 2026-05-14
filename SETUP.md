@@ -143,7 +143,10 @@ mosquitto_sub -h <analysis-pc> -t 'pieeg/health' -v
 
 ## 3. Pi-B (Roomba 制御 Raspberry Pi)
 
-> 既存の `roomba_arudino_raspberrypi_client` (FastAPI) が稼働している前提。
+> Arduino シリアル制御 + USB カメラ MJPEG の FastAPI ブリッジ (`8000/tcp`) が
+> 動いている前提。リポジトリ内の `pi_b_roomba_addon/roomba_arduino_client/` に
+> ソースのスナップショットがある (`roomba.ino`, `roomba_api.py`, 配線・分圧
+> ドキュメント等)。新規 Pi-B 立て直しの場合はそちらの README を参照のこと。
 
 ### 3.1 既存 FastAPI の稼働確認
 ```bash
