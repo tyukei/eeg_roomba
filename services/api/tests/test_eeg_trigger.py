@@ -253,6 +253,68 @@ def test_disable_stops_only_eeg_started_autopilot(client):
     assert stopped == []
 
 
+def test_autopilot_stop_restores_dispatch_when_trigger_disabled(client):
+    """Stopping a test-fire (or any eeg-launched run) while the trigger is
+    DISABLED must restore `dispatch=forward_stop` so decision_svc resumes
+    its legacy α→forward behaviour. Otherwise a one-shot test-fire would
+    permanently mute decision_svc.
+    """
+    _, main = client
+    main.app.state.eeg_trigger["enabled"] = False  # trigger off, test-fire-only
+    main.app.state.autopilot["running"] = True
+    main.app.state.autopilot["src"] = "eeg"
+    main.app.state.autopilot["task"] = None  # nothing to await
+    main.app.state.mq.publish.reset_mock()
+
+    async def _run():
+        await main._autopilot_stop_internal(src="user")
+
+    asyncio.run(_run())
+
+    calls = [a for a, _ in main.app.state.mq.publish.call_args_list if a and a[0] == "control/decision_mode"]
+    assert calls, "stop must republish control/decision_mode for eeg-launched runs"
+    assert json.loads(calls[-1][1]) == {"dispatch": "forward_stop"}
+
+
+def test_autopilot_stop_keeps_dispatch_off_when_trigger_enabled(client):
+    """If the trigger is still armed, the user wants decision_svc to stay
+    quiet between runs. Stopping must keep dispatch=off."""
+    _, main = client
+    main.app.state.eeg_trigger["enabled"] = True
+    main.app.state.autopilot["running"] = True
+    main.app.state.autopilot["src"] = "eeg"
+    main.app.state.autopilot["task"] = None
+    main.app.state.mq.publish.reset_mock()
+
+    async def _run():
+        await main._autopilot_stop_internal(src="user")
+
+    asyncio.run(_run())
+
+    calls = [a for a, _ in main.app.state.mq.publish.call_args_list if a and a[0] == "control/decision_mode"]
+    assert calls
+    assert json.loads(calls[-1][1]) == {"dispatch": "off"}
+
+
+def test_autopilot_stop_user_src_doesnt_touch_dispatch(client):
+    """A manually-started autopilot stop must NOT republish decision_mode —
+    that topic is owned by the EEG trigger, not the manual flow.
+    """
+    _, main = client
+    main.app.state.autopilot["running"] = True
+    main.app.state.autopilot["src"] = "user"
+    main.app.state.autopilot["task"] = None
+    main.app.state.mq.publish.reset_mock()
+
+    async def _run():
+        await main._autopilot_stop_internal(src="user")
+
+    asyncio.run(_run())
+
+    calls = [a for a, _ in main.app.state.mq.publish.call_args_list if a and a[0] == "control/decision_mode"]
+    assert calls == [], "manual stop must not touch control/decision_mode"
+
+
 def test_test_fire_starts_autopilot_with_trigger_config(client):
     """POST /eeg-trigger/test-fire should kick off the autopilot using the
     stored trigger config and stamp the run with src='eeg'."""

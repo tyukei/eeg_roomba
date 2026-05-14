@@ -141,8 +141,18 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
         const t = await r.text();
         throw new Error(t || `HTTP ${r.status}`);
       }
-      // Optimistic flip — the poll will overwrite within ~1.5s.
-      setAutopilotRunning(!autopilotRunning);
+      // Set the new running state from the server's response, not from our
+      // optimistic guess. A double-click could otherwise flip us back to
+      // "stop" when the server actually returned already_running.
+      let nextRunning = !autopilotRunning;
+      try {
+        const body = await r.json();
+        if (typeof body?.status === "string") {
+          nextRunning =
+            body.status === "started" || body.status === "already_running";
+        }
+      } catch { /* response wasn't JSON; fall back to optimistic flip */ }
+      setAutopilotRunning(nextRunning);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
     } finally {
@@ -166,6 +176,13 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
   }
 
   const goalValue = goalDraft ?? cfg.goal;
+  // Goal mode without an actual goal is a misconfiguration — disable fire so
+  // the user can't accidentally start a run that immediately stops on
+  // "(empty goal)". Stop is always allowed even with an empty goal.
+  const fireDisabled =
+    !autopilotRunning &&
+    cfg.mode === "goal" &&
+    !(goalValue || "").trim();
 
   return (
     <div className="panel eeg-trigger-panel">
@@ -248,11 +265,13 @@ export function EegTriggerPanel({ apiBase, decisionState }: EegTriggerPanelProps
           <button
             type="button"
             className={`btn small ${autopilotRunning ? "stop" : ""}`}
-            disabled={submitting || !cfg.model_available}
+            disabled={submitting || !cfg.model_available || fireDisabled}
             onClick={testFireOrStop}
             title={
               autopilotRunning
                 ? "Stop the currently running autopilot."
+                : fireDisabled
+                ? "Set a goal first — goal-mode autopilot needs a target."
                 : "Fire the autopilot now with the current goal — useful for testing without actually triggering α."
             }
           >

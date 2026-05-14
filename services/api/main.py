@@ -853,9 +853,28 @@ async def _autopilot_stop_internal(*, src: str = "user") -> dict[str, Any]:
                 pass
         except asyncio.CancelledError:
             pass
+    prior_src = ap.get("src")
     ap["task"] = None
     ap["src"] = None
     log.info("autopilot stopped (src=%s)", src)
+
+    # If the autopilot was launched by the EEG flow (real fire or test-fire),
+    # decision_svc has been silenced via retained `control/decision_mode=off`.
+    # Now that the run is done, restore the dispatch mode to match the *user's*
+    # trigger preference — otherwise a one-shot test-fire would mute the legacy
+    # α→forward path forever. Keep it `off` only when the trigger is armed.
+    if prior_src and prior_src.startswith("eeg"):
+        trig = app.state.eeg_trigger
+        dispatch = "off" if trig.get("enabled") else "forward_stop"
+        try:
+            app.state.mq.publish(
+                "control/decision_mode",
+                json.dumps({"dispatch": dispatch}),
+                qos=1,
+                retain=True,
+            )
+        except Exception:  # noqa: BLE001
+            log.exception("control/decision_mode restore publish failed")
     return {"status": "stopped", "src": src}
 
 
