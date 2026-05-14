@@ -102,7 +102,10 @@ export function AutopilotPanel({ apiBase, layout = "vertical" }: AutopilotPanelP
   const lastReason = status.last_reason;
 
   if (layout === "horizontal") {
-    // One-row strip: pill + form + last decision + start/stop.
+    // Controls strip on top, then a horizontal-scrolling decision history
+    // (newest on the left) where each card shows ts + cmd + full reason.
+    const decisionCards = [...status.decisions].reverse();
+
     return (
       <div className="panel autopilot-panel autopilot-horizontal">
         <div className="autopilot-strip">
@@ -171,14 +174,11 @@ export function AutopilotPanel({ apiBase, layout = "vertical" }: AutopilotPanelP
             </label>
           </div>
 
-          <div className="autopilot-strip-decision">
+          <div className="autopilot-strip-latest">
             {(lastCmd || lastReason) ? (
-              <>
-                {lastCmd && <span className="cmd-tag">{lastCmd}</span>}
-                <span className="autopilot-strip-reason" title={lastReason ?? ""}>
-                  {lastReason || "—"}
-                </span>
-              </>
+              <span className={`cmd-tag latest`} title={lastReason ?? ""}>
+                last: {lastCmd ?? "—"}
+              </span>
             ) : (
               <small>no decision yet</small>
             )}
@@ -209,6 +209,24 @@ export function AutopilotPanel({ apiBase, layout = "vertical" }: AutopilotPanelP
         {!status.model_available && (
           <div className="analyze-err autopilot-strip-err" role="alert">
             GEMINI_API_KEY not set on api service — autopilot disabled.
+          </div>
+        )}
+
+        {decisionCards.length > 0 && (
+          <div className="autopilot-decisions" aria-label="recent autopilot decisions">
+            {decisionCards.map((d, i) => (
+              <div key={`${d.ts}-${i}`} className={`autopilot-decision ${d.ok ? "" : "bad"}`}>
+                <div className="autopilot-decision-head">
+                  <span className="autopilot-decision-ts">
+                    {new Date(d.ts * 1000).toLocaleTimeString()}
+                  </span>
+                  <span className={`cmd-tag ${d.ok ? "" : "bad"}`}>{d.command}</span>
+                </div>
+                <div className="autopilot-decision-reason">
+                  {d.reason || (d.ok ? "" : "(error)")}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

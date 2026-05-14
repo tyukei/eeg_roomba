@@ -690,7 +690,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 /* Autopilot panel — horizontal strip (Roomba tab row 2) */
 .autopilot-horizontal .autopilot-strip {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  /* head + form + latest-tag + actions; the latest column is `auto` so it
+   * never steals reason width — full reasons live in the decision cards
+   * below the strip. */
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
 }
@@ -729,15 +732,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .autopilot-strip-form input:disabled {
   opacity: 0.55; cursor: not-allowed;
 }
-.autopilot-strip-decision {
-  display: flex; align-items: center; gap: 8px;
-  min-width: 0;
-}
-.autopilot-strip-reason {
-  font-size: 11px; line-height: 1.4;
-  color: var(--text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  flex: 1; min-width: 0;
+.autopilot-strip-latest { display: flex; align-items: center; }
+.autopilot-strip-latest .cmd-tag.latest {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+  color: var(--accent);
 }
 .autopilot-strip-actions { display: flex; }
 .autopilot-strip-err {
@@ -746,12 +744,49 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   padding: 4px 8px;
 }
 
+/* Decision history — horizontal-scrolling card row, newest first. Each card
+ * shows ts + cmd + full reason (no ellipsis on the reason; the card itself
+ * caps its height with internal vertical scroll so an unusually long reason
+ * doesn't push the rest of the page around). */
+.autopilot-decisions {
+  display: flex; gap: 8px;
+  margin-top: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.autopilot-decision {
+  flex: 0 0 260px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  border-left: 2px solid var(--accent);
+  padding: 6px 10px;
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.autopilot-decision.bad {
+  border-left-color: var(--bad);
+}
+.autopilot-decision-head {
+  display: flex; align-items: center; gap: 6px;
+}
+.autopilot-decision-ts {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px; color: var(--muted);
+}
+.autopilot-decision-reason {
+  font-size: 11px; line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 @media (max-width: 1100px) {
   .autopilot-horizontal .autopilot-strip {
     grid-template-columns: 1fr;
     gap: 6px;
   }
-  .autopilot-strip-decision { border-top: 1px solid var(--border); padding-top: 6px; }
+  .autopilot-strip-latest { border-top: 1px solid var(--border); padding-top: 6px; }
 }
 
 /* Autopilot panel (vertical / legacy layout — kept for fallback) */
