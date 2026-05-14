@@ -170,7 +170,17 @@ export default function App() {
 
       <main className="content">
         {tab === "live" && (
-          <Live state={s} liveBuf={liveBuf} bandsBuf={bandsBuf} tick={tick} setThresh={setThresh} />
+          <Live
+            state={s}
+            liveBuf={liveBuf}
+            bandsBuf={bandsBuf}
+            tick={tick}
+            setThresh={setThresh}
+            apiBase={API_BASE}
+            trajHistory={trajHistory}
+            camOn={camOn}
+            setCamOn={setCamOn}
+          />
         )}
         {tab === "pieeg" && (
           <PiEEG state={s} liveBuf={liveBuf} bandsBuf={bandsBuf} tick={tick} apiBase={API_BASE} />

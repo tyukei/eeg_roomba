@@ -95,14 +95,67 @@ body {
 
 .content { padding: 20px 24px; }
 
-/* Live tab — 2-col main + side */
-.app {
+/* Live tab — 3-col dashboard. Decision hero spans all columns at the
+ * top; each column is a flex stack of panels. Goal: fit on one screen
+ * without scrolling on 1080p+, gracefully fall back to 2 then 1 col on
+ * narrower viewports.
+ *
+ * Column 1 (widest, 1.4fr): EEG live 16-ch sparkline grid + α bars —
+ *   needs horizontal room.
+ * Column 2 (1fr): cognitive metrics — Mind state, 3D trajectory, HR.
+ * Column 3 (1fr): Roomba context — camera, trajectory map, thresholds.
+ */
+.live-wrap {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
   align-items: start;
 }
-.side { display: flex; flex-direction: column; gap: 20px; }
+.live-wrap > .decision-hero { grid-column: 1 / -1; }
+.live-col {
+  display: flex; flex-direction: column; gap: 12px;
+  min-width: 0;
+}
+.live-wrap .panel { padding: 10px 12px; }
+.live-wrap .panel-head { margin-bottom: 6px; }
+.live-wrap .panel-head h2 { font-size: 11px; }
+/* Decision hero — compact variant for the dashboard banner. 36 px keeps
+ * dominance on the busy dashboard view (30 px got skimmed past) while
+ * still being shorter than the original full-page 48 px treatment. */
+.live-wrap .decision-hero {
+  padding: 12px 18px 12px 22px;
+}
+.live-wrap .decision-hero-state { font-size: 36px; }
+.live-wrap .decision-hero-label { font-size: 10px; }
+.live-wrap .decision-hero-sub { font-size: 12px; }
+
+/* Mind 3D inside the narrow middle column — shrink the canvas so it
+ * fits without forcing the column wider. At 1-col fallback (900 px and
+ * below), the canvas would otherwise look like a toy at 200 px on a
+ * full-width mobile view, so let it grow back to 320 px. */
+.live-wrap .mind3d-canvas,
+.live-wrap .mind3d-loading { height: 200px; }
+@media (max-width: 900px) {
+  .live-wrap .mind3d-canvas,
+  .live-wrap .mind3d-loading { height: 320px; }
+}
+
+/* Camera + traj-map compact variants for the side column. */
+.cam-panel-compact .cam-area { max-height: 180px; aspect-ratio: 4 / 3; }
+.cam-panel-compact .cam-area img { object-fit: contain; }
+.traj-map-compact .traj-canvas svg { max-height: 180px; width: auto; max-width: 100%; }
+.traj-map-compact .traj-canvas { display: flex; justify-content: center; }
+
+@media (max-width: 1280px) {
+  .live-wrap {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .live-wrap {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* Roomba tab — compact 3-row layout that fits on one screen without
    scrolling:
@@ -1533,7 +1586,6 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 small { color: var(--muted); }
 
 @media (max-width: 1200px) {
-  .app { grid-template-columns: 1fr; }
   .traj-wrap { grid-template-columns: 1fr; }
   .analysis-wrap { grid-template-columns: 1fr; }
 }
