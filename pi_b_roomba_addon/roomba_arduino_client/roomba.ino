@@ -19,7 +19,7 @@ void setup() {
 
   // 通信確認: 起動時にビープ音を鳴らす
   device.write(140); // Define Song
-  device.write(0);   // Song slot 0
+  device.write(byte(0)); // Song slot 0
   device.write(2);   // 2 notes
   device.write(72);  // C5
   device.write(16);
@@ -27,7 +27,7 @@ void setup() {
   device.write(16);
   delay(100);
   device.write(141); // Play Song
-  device.write(0);
+  device.write(byte(0));
 
   Serial.println("Roomba initialized!");
 }
