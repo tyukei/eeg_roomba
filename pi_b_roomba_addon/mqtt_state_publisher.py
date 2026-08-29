@@ -36,7 +36,7 @@ def main() -> None:
             online = False
             extra: dict = {}
             try:
-                r = http.get(f"{ROOMBA_BASE}/")
+            r = http.get(f"{ROOMBA_BASE}/state")
                 online = r.status_code < 500
                 try:
                     extra = r.json()

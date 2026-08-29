@@ -170,6 +170,7 @@ body {
   grid-template-areas:
     "estop estop estop"
     "cam   traj  ctrl"
+    "sensor sensor sensor"
     "trig  trig  trig"
     "auto  auto  auto"
     "cmds  cmds  cmds";
@@ -180,6 +181,7 @@ body {
 .roomba-wrap > .cam-panel          { grid-area: cam; }
 .roomba-wrap > .traj-map-panel     { grid-area: traj; }
 .roomba-wrap > .ctrl-panel         { grid-area: ctrl; }
+.roomba-wrap > .sensor-panel       { grid-area: sensor; }
 .roomba-wrap > .eeg-trigger-panel  { grid-area: trig; }
 .roomba-wrap > .autopilot-panel    { grid-area: auto; }
 .roomba-wrap > .cmds-panel         { grid-area: cmds; }
@@ -201,6 +203,17 @@ body {
   font-size: 10px;
   letter-spacing: .04em;
 }
+.bridge-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: var(--muted); }
+.bridge-dot.ok { background: var(--ok); box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 70%, transparent); }
+.bridge-dot.bad { background: var(--bad); }
+.mode-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 6px; }
+.mode-actions .btn { padding: 5px 3px; font-size: 10px; }
+.sensor-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.sensor-item { min-width: 0; padding: 7px 8px; background: var(--surface-2); border-radius: 5px; }
+.sensor-item small { display: block; color: var(--muted); font-size: 10px; }
+.sensor-item strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; margin-top: 2px; }
+.sensor-error { color: var(--bad); display: block; margin-top: 6px; }
+@media (max-width: 640px) { .sensor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 @media (max-width: 1280px) {
   .roomba-wrap {
@@ -209,6 +222,7 @@ body {
       "estop estop"
       "cam   ctrl"
       "traj  ctrl"
+      "sensor sensor"
       "trig  trig"
       "auto  auto"
       "cmds  cmds";
@@ -217,7 +231,7 @@ body {
 @media (max-width: 900px) {
   .roomba-wrap {
     grid-template-columns: 1fr;
-    grid-template-areas: "estop" "cam" "traj" "ctrl" "trig" "auto" "cmds";
+    grid-template-areas: "estop" "cam" "traj" "ctrl" "sensor" "trig" "auto" "cmds";
   }
 }
 

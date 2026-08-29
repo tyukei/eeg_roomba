@@ -32,6 +32,38 @@ app.add_middleware(
 
 # Global serial connection
 ser: Optional[serial.Serial] = None
+last_arduino_response = ""
+last_sensor: dict = {}
+last_sensor_ts: float | None = None
+
+
+def _record_arduino_response(response: str) -> None:
+    """Keep the latest Arduino response and extract its compact sensor line.
+
+    The Arduino emits `S,key=value,...` after a sensor query.  Keeping this
+    parsing at the bridge makes the rest of the stack independent of serial
+    framing and lets the web UI use ordinary JSON.
+    """
+    global last_arduino_response, last_sensor, last_sensor_ts
+    last_arduino_response = response[-1000:]
+    for line in reversed(response.splitlines()):
+        if not line.startswith("S,"):
+            continue
+        values: dict[str, int | bool] = {}
+        for item in line[2:].split(","):
+            key, sep, raw = item.partition("=")
+            if not sep:
+                continue
+            try:
+                parsed = int(raw)
+                # -1 is the Arduino's explicit "sensor unavailable" marker.
+                values[key] = bool(parsed) if key in {"bump_left", "bump_right", "wall", "cliff"} and parsed >= 0 else parsed
+            except ValueError:
+                continue
+        if values:
+            last_sensor = values
+            last_sensor_ts = time.time()
+        return
 
 
 def _find_usb_camera() -> str:
@@ -192,7 +224,10 @@ def send_command(cmd_type: str):
         "right": b'1',
         "left": b'2',
         "back": b'3',
-        "stop": b's' # Stop on any other char
+        "stop": b's', # Stop on any other char
+        "clean": b'c',
+        "pause": b'p',
+        "dock": b'd',
     }
     
     if cmd_type not in command_map:
@@ -207,6 +242,7 @@ def send_command(cmd_type: str):
         time.sleep(0.1)
         if ser.in_waiting > 0:
             response = ser.read(ser.in_waiting).decode('utf-8', errors='ignore')
+        _record_arduino_response(response)
             
         return {
             "status": "sent", 
@@ -216,6 +252,32 @@ def send_command(cmd_type: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/state")
+def state():
+    """Latest bridge status and sensor values; safe to poll from the phone."""
+    global ser
+    if ser and ser.is_open:
+        try:
+            # Arduino answers this with a single `S,...` line.  Sensor polling
+            # is intentionally opt-in here (rather than in a background loop)
+            # to avoid flooding its SoftwareSerial connection.
+            ser.write(b'i')
+            # Up to eight OI packet reads can each wait briefly for an older
+            # Roomba model, so allow the Arduino's complete snapshot to arrive.
+            time.sleep(0.75)
+            if ser.in_waiting > 0:
+                _record_arduino_response(ser.read(ser.in_waiting).decode('utf-8', errors='ignore'))
+        except Exception as e:
+            return {"online": False, "connected": False, "error": str(e)}
+    return {
+        "online": bool(ser and ser.is_open),
+        "connected": bool(ser and ser.is_open),
+        "sensor": last_sensor,
+        "sensor_ts": last_sensor_ts,
+        "arduino_response": last_arduino_response,
+    }
 
 
 @app.post("/camera/start")

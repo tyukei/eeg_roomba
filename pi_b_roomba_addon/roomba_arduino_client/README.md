@@ -56,7 +56,8 @@ Arduino Uno と Roomba (Open Interface 対応モデル) のシリアル接続:
 
 **PC (`services/api`) → このサービス**: HTTP REST
 - `POST /connect`, `/disconnect`
-- `POST /command/{forward|right|left|back|stop}`
+- `POST /command/{forward|right|left|back|stop|clean|pause|dock}`
+- `GET /state` (serial connection + latest Open Interface sensor snapshot)
 - `POST /camera/start`, `/camera/stop`
 - `GET  /camera/stream` (multipart/x-mixed-replace; boundary=frame)
 - `GET  /ports`, `/camera/status`
@@ -69,6 +70,10 @@ Arduino Uno と Roomba (Open Interface 対応モデル) のシリアル接続:
 | `'1'` (49) | 右旋回 |
 | `'2'` (50) | 左旋回 |
 | `'3'` (51) | 後退 |
+| `'c'` | 掃除開始 |
+| `'p'` | 掃除停止して Safe mode に戻る |
+| `'d'` | ホームベース探索 |
+| `'i'` | バンパー・壁・段差・バッテリー状態を問い合わせる |
 | その他 | 停止 |
 
 **Arduino → Roomba**: 115200 baud SoftwareSerial, Roomba OI バイナリ

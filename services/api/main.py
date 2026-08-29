@@ -44,6 +44,10 @@ SUBS: dict[str, set[WebSocket]] = {
     "roomba/cmd": set(),
 }
 
+# Keep this list deliberately small.  This endpoint ultimately controls a
+# physical robot, so it must not act as an open proxy to Pi-B's command URL.
+MANUAL_ROOMBA_COMMANDS = {"forward", "right", "left", "back", "stop", "clean", "pause", "dock"}
+
 
 def _dsn() -> str:
     return (
@@ -429,6 +433,17 @@ async def serial_status() -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
+@app.get("/control/state")
+async def roomba_state() -> dict[str, Any]:
+    """Return Pi-B's latest serial and Open Interface sensor snapshot."""
+    try:
+        r = await app.state.http.get(f"{ROOMBA_BASE}/state", timeout=3.0)
+        r.raise_for_status()
+        return r.json()
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
 async def _dispatch_command(
     cmd: str,
     src: str = "manual",
@@ -482,6 +497,8 @@ async def proxy_control(cmd: str) -> dict[str, Any]:
     background and ack immediately; the actual outcome is published to
     `roomba/cmd` from `_dispatch_command` once known.
     """
+    if cmd not in MANUAL_ROOMBA_COMMANDS:
+        raise HTTPException(status_code=400, detail="Unsupported Roomba command")
     asyncio.create_task(_dispatch_command(cmd))
     return {"ok": True, "cmd": cmd, "queued": True}
 
