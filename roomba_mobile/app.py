@@ -20,7 +20,7 @@ from typing import Any
 
 import serial
 import serial.tools.list_ports
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -393,6 +393,23 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Roomba Mobile Controller", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def revalidate_ui(request: Request, call_next):
+    """Keep phones off stale builds.
+
+    The UI is served straight off disk and redeployed often. Without an
+    explicit directive a browser applies heuristic caching and can sit on an
+    old bundle for hours without ever asking the server. `no-cache` forces a
+    revalidation, which the existing ETag answers with a cheap 304 whenever
+    nothing actually changed.
+    """
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 class ConnectionConfig(BaseModel):
