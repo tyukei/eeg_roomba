@@ -268,6 +268,7 @@ class CameraStreamer:
         self.height = CAM_HEIGHT
         self.fps = CAM_FPS
         self.quality = CAM_QUALITY
+        self.capture_size = (CAM_WIDTH, CAM_HEIGHT)
         self.error = ""
         self._frame: bytes | None = None
         self._lock = threading.Lock()
@@ -297,6 +298,14 @@ class CameraStreamer:
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         cap.set(cv2.CAP_PROP_FPS, fps)
 
+        # A UVC camera only offers discrete modes, so the driver silently
+        # snaps to the nearest one (asking for 480x360 can yield 640x360).
+        # Record what we actually got; `_capture_loop` scales down to the
+        # requested size so the bandwidth knobs mean what they say.
+        self.capture_size = (
+            int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or width,
+            int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or height,
+        )
         self.cap = cap
         self.device = target
         self.width, self.height, self.fps = width, height, fps
@@ -323,6 +332,10 @@ class CameraStreamer:
             if not ok:
                 time.sleep(0.05)
                 continue
+            if (frame.shape[1], frame.shape[0]) != (self.width, self.height):
+                # INTER_AREA is the right filter for downscaling and is cheap
+                # enough at these sizes to run every frame on a Pi.
+                frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
             ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), self.quality])
             if not ok:
                 continue
@@ -348,6 +361,8 @@ class CameraStreamer:
             "height": self.height,
             "fps": self.fps,
             "quality": self.quality,
+            "capture_width": self.capture_size[0],
+            "capture_height": self.capture_size[1],
             "opencv_installed": cv2 is not None,
             "available": bool(find_capture_device()) if not self.running else True,
             "error": self.error,
