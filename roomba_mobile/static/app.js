@@ -12,7 +12,7 @@ const CHARGING = {
 
 let ws = null;
 let wsReady = false;
-let heldCmd = null;
+let currentDir = "stop";
 let holdTimer = null;
 let toastTimer = null;
 
@@ -58,51 +58,126 @@ async function send(cmd) {
   }
 }
 
-/* ---------- hold-to-drive ---------- */
+/* ---------- joystick ---------- */
 
-function beginHold(button, cmd) {
-  if (heldCmd) return;
-  heldCmd = cmd;
-  button.classList.add("active");
-  navigator.vibrate?.(10);
-  send(cmd);
-  holdTimer = window.setInterval(() => send(cmd), HOLD_REFRESH_MS);
+const stick = $("stick");
+const knob = $("knob");
+const knobLabel = $("knob-label");
+
+// Fraction of the stick's own radius the knob may travel, and how far it must
+// be pushed before a command fires.
+const KNOB_TRAVEL = 0.34;
+const DEADZONE = 0.25;
+const DIR_LABEL = { forward: "前", back: "後", left: "左", right: "右", stop: "" };
+const KEY_DIR = {
+  ArrowUp: "forward", ArrowDown: "back", ArrowLeft: "left", ArrowRight: "right",
+};
+
+let stickPointer = null;
+let stickCenter = { x: 0, y: 0 };
+let stickMax = 1;
+
+function directionFrom(nx, ny) {
+  // The Arduino only understands four discrete moves, so the stick's angle
+  // picks a quadrant rather than a continuous heading.
+  if (Math.hypot(nx, ny) < DEADZONE) return "stop";
+  if (Math.abs(nx) >= Math.abs(ny)) return nx > 0 ? "right" : "left";
+  return ny > 0 ? "back" : "forward";
 }
 
-function endHold() {
-  if (!heldCmd) return;
+function moveKnob(dx, dy) {
+  knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+}
+
+function drive(dir) {
+  if (dir === currentDir) return;
+  currentDir = dir;
   window.clearInterval(holdTimer);
   holdTimer = null;
-  heldCmd = null;
-  document.querySelectorAll(".dir.active").forEach((b) => b.classList.remove("active"));
-  send("stop");
+
+  const moving = dir !== "stop";
+  knob.classList.toggle("engaged", moving);
+  stick.classList.toggle("active", moving);
+  knobLabel.textContent = DIR_LABEL[dir] ?? "";
+  if (moving) navigator.vibrate?.(8);
+
+  send(dir);
+  if (moving) holdTimer = window.setInterval(() => send(dir), HOLD_REFRESH_MS);
 }
 
-for (const button of document.querySelectorAll(".dir")) {
-  const cmd = button.dataset.cmd;
-  button.addEventListener("pointerdown", (ev) => {
-    ev.preventDefault();
-    // Capture so a thumb that drifts off the button keeps driving; the
-    // matching pointerup still lands here and stops.
-    button.setPointerCapture?.(ev.pointerId);
-    beginHold(button, cmd);
-  });
-  button.addEventListener("pointerup", endHold);
-  button.addEventListener("pointercancel", endHold);
-  button.addEventListener("contextmenu", (ev) => ev.preventDefault());
+function releaseStick() {
+  stickPointer = null;
+  knob.classList.add("settling");
+  moveKnob(0, 0);
+  window.setTimeout(() => knob.classList.remove("settling"), 200);
+  drive("stop");
 }
+
+function updateStick(clientX, clientY) {
+  let dx = clientX - stickCenter.x;
+  let dy = clientY - stickCenter.y;
+  const magnitude = Math.hypot(dx, dy);
+  if (magnitude > stickMax) {
+    dx = (dx / magnitude) * stickMax;
+    dy = (dy / magnitude) * stickMax;
+  }
+  moveKnob(dx, dy);
+  drive(directionFrom(dx / stickMax, dy / stickMax));
+}
+
+stick.addEventListener("pointerdown", (ev) => {
+  ev.preventDefault();
+  const rect = stick.getBoundingClientRect();
+  stickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  stickMax = rect.width * KNOB_TRAVEL;
+  stickPointer = ev.pointerId;
+  knob.classList.remove("settling");
+  // Capture so a thumb that leaves the circle keeps steering; the matching
+  // pointerup still lands here and stops.
+  stick.setPointerCapture?.(ev.pointerId);
+  updateStick(ev.clientX, ev.clientY);
+});
+
+stick.addEventListener("pointermove", (ev) => {
+  if (stickPointer !== ev.pointerId) return;
+  updateStick(ev.clientX, ev.clientY);
+});
+
+for (const type of ["pointerup", "pointercancel"]) {
+  stick.addEventListener(type, (ev) => {
+    if (stickPointer !== ev.pointerId) return;
+    releaseStick();
+  });
+}
+
+stick.addEventListener("contextmenu", (ev) => ev.preventDefault());
+
+// Arrow keys drive too, which makes the app usable from a laptop.
+window.addEventListener("keydown", (ev) => {
+  const dir = KEY_DIR[ev.key];
+  if (!dir || ev.repeat || stickPointer !== null) return;
+  ev.preventDefault();
+  const offsets = { forward: [0, -1], back: [0, 1], left: [-1, 0], right: [1, 0] };
+  const travel = stick.getBoundingClientRect().width * KNOB_TRAVEL;
+  moveKnob(offsets[dir][0] * travel, offsets[dir][1] * travel);
+  drive(dir);
+});
+
+window.addEventListener("keyup", (ev) => {
+  if (KEY_DIR[ev.key] && stickPointer === null) releaseStick();
+});
 
 // Anything that takes the page out of the driver's hands is a stop.
-window.addEventListener("blur", endHold);
-window.addEventListener("pagehide", endHold);
+window.addEventListener("blur", releaseStick);
+window.addEventListener("pagehide", releaseStick);
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) endHold();
+  if (document.hidden) releaseStick();
 });
 
 $("stop").addEventListener("click", () => {
-  endHold();
+  releaseStick();
   navigator.vibrate?.(30);
-  send("stop");
+  send("stop"); // unconditional, even when already stopped
 });
 
 for (const button of document.querySelectorAll(".mode")) {
@@ -139,8 +214,8 @@ function renderState(state) {
 
 async function pollState() {
   // Reading sensors holds the Arduino's serial link for ~0.75 s, so never do
-  // it while a button is held.
-  if (heldCmd) return;
+  // it while the stick is engaged.
+  if (currentDir !== "stop") return;
   try {
     const res = await fetch("/state");
     if (!res.ok) throw new Error(String(res.status));

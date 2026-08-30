@@ -100,38 +100,73 @@ select {
 .chip.alert { border-color: var(--danger); }
 .chip.alert strong { color: var(--danger); }
 
-/* ---- D-pad ---- */
+/* ---- joystick ---- */
 .pad {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-template-areas: ". up ." "left core right" ". down .";
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
-  /* The pad owns its gestures: no scrolling, zooming or text selection. */
+  /* The stick owns its gestures: no scrolling, zooming or text selection. */
   touch-action: none;
   user-select: none;
-  margin-top: 2px;
-}
-.up { grid-area: up; } .down { grid-area: down; }
-.left { grid-area: left; } .right { grid-area: right; }
-
-.pad-core {
-  grid-area: core;
-  display: flex; align-items: center; justify-content: center; text-align: center;
-  font-size: .68rem; line-height: 1.4; color: var(--muted);
+  -webkit-user-select: none;
 }
 
-.dir {
-  aspect-ratio: 1; width: 100%; border: 1px solid var(--line); border-radius: 18px;
-  background: var(--panel); color: var(--text);
-  display: flex; align-items: center; justify-content: center;
+.stick {
+  position: relative;
+  width: min(70vw, 250px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: radial-gradient(circle at 50% 42%, var(--panel-2), var(--panel) 72%);
+  box-shadow: inset 0 2px 14px rgba(0, 0, 0, .55);
   touch-action: none;
+  transition: border-color .12s;
 }
-.dir svg { width: 42%; height: 42%; fill: currentColor; }
-.dir.active {
-  background: var(--accent); color: #07130c;
-  border-color: var(--accent); box-shadow: 0 0 18px rgba(74, 222, 128, .35);
+.stick:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.stick.active { border-color: var(--accent); }
+
+.stick-hints {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: var(--muted);
+  opacity: .5;
+  pointer-events: none;
 }
-.dir:disabled { opacity: .35; }
+
+.knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--muted);
+  pointer-events: none;
+  transition: background .12s, color .12s, border-color .12s, box-shadow .12s;
+}
+/* Snap back to centre only on release; during a drag the knob must track
+   the thumb without lag. */
+.knob.settling { transition: transform .16s ease-out, background .12s, color .12s; }
+.knob.engaged {
+  background: var(--accent);
+  color: #07130c;
+  border-color: var(--accent);
+  box-shadow: 0 0 22px rgba(74, 222, 128, .45);
+}
+
+.pad-hint { margin: 0; font-size: .7rem; color: var(--muted); }
 
 /* ---- stop ---- */
 .stop {
