@@ -103,3 +103,14 @@ def test_websocket_disconnect_stops_the_roomba(client):
 def test_command_without_serial_is_a_400(client):
     client.post("/disconnect")
     assert client.post("/command/forward").status_code == 400
+
+
+def test_ui_is_served_with_revalidation(client):
+    """A phone must never sit on a stale bundle after a redeploy."""
+    for path in ("/", "/static/app.js"):
+        assert client.get(path).headers["cache-control"] == "no-cache"
+
+
+def test_api_responses_are_not_marked_no_cache(client):
+    # The directive is for the UI shell only; API responses must not inherit it.
+    assert "cache-control" not in client.get("/healthz").headers
