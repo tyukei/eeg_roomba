@@ -252,7 +252,7 @@ cameraToggle.addEventListener("change", () => {
     localStorage.setItem("camera", "1");
   } else {
     stopCamera();
-    localStorage.removeItem("camera");
+    localStorage.setItem("camera", "0");
   }
 });
 
@@ -268,7 +268,9 @@ async function initCamera() {
     cameraToggle.disabled = true;
     return;
   }
-  if (localStorage.getItem("camera") === "1") {
+  // A driver looking at the phone wants the view by default; only an
+  // explicit opt-out keeps it off.
+  if (localStorage.getItem("camera") !== "0") {
     cameraToggle.checked = true;
     startCamera();
   }

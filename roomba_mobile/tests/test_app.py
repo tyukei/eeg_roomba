@@ -19,8 +19,11 @@ class FakeSerial:
     def write(self, data: bytes) -> int:
         self.writes.append(data)
         if data == roomba_app.SENSOR_CHAR:
+            # The real Arduino echoes the command char first, so the sensor
+            # line arrives prefixed — `iS,...`, not `S,...`.
             self.pending = (
-                b"S,bump_left=1,bump_right=0,wall=0,cliff=-1,charging_state=2,"
+                b"Received command: 105\r\n"
+                b"iS,bump_left=1,bump_right=0,wall=0,cliff=-1,charging_state=2,"
                 b"voltage_mv=15000,charge_mah=1200,capacity_mah=2400\r\n"
             )
         return len(data)

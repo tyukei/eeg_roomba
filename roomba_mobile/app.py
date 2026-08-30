@@ -142,10 +142,14 @@ class SerialLink:
             return
         self.last_response = response[-1000:]
         for line in reversed(response.splitlines()):
-            if not line.startswith("S,"):
+            # The Arduino echoes the command char before replying, so the
+            # sensor line arrives as `iS,bump_left=...` rather than starting
+            # with `S,`. Anchor on the marker instead of the line start.
+            marker = line.find("S,")
+            if marker < 0:
                 continue
             values: dict[str, int | bool] = {}
-            for item in line[2:].split(","):
+            for item in line[marker + 2:].split(","):
                 key, sep, raw = item.partition("=")
                 if not sep:
                     continue
