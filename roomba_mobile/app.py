@@ -57,6 +57,14 @@ HTTP_PORT = int(os.environ.get("ROOMBA_HTTP_PORT", "8000"))
 # A phone that loses Wi-Fi mid-drive must not leave the Roomba running.
 HOLD_TIMEOUT = float(os.environ.get("ROOMBA_HOLD_TIMEOUT_MS", "800")) / 1000.0
 
+# MJPEG costs one full JPEG per frame, so bandwidth scales with fps x quality.
+# These defaults favour a responsive feed over a pretty one: the driver needs
+# to see obstacles, not read text, and the Pi shares its uplink with the phone.
+CAM_WIDTH = int(os.environ.get("ROOMBA_CAM_WIDTH", "480"))
+CAM_HEIGHT = int(os.environ.get("ROOMBA_CAM_HEIGHT", "360"))
+CAM_FPS = int(os.environ.get("ROOMBA_CAM_FPS", "8"))
+CAM_QUALITY = int(os.environ.get("ROOMBA_CAM_QUALITY", "45"))
+
 
 class SerialLink:
     """Thread-safe wrapper around the Arduino serial port.
@@ -256,17 +264,17 @@ class CameraStreamer:
         self.cap: Any = None
         self.running = False
         self.device = ""
-        self.width = 640
-        self.height = 480
-        self.fps = 15
-        self.quality = 70
+        self.width = CAM_WIDTH
+        self.height = CAM_HEIGHT
+        self.fps = CAM_FPS
+        self.quality = CAM_QUALITY
         self.error = ""
         self._frame: bytes | None = None
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
 
-    def start(self, device: str = "", width: int = 640, height: int = 480,
-              fps: int = 15, quality: int = 70) -> None:
+    def start(self, device: str = "", width: int = CAM_WIDTH, height: int = CAM_HEIGHT,
+              fps: int = CAM_FPS, quality: int = CAM_QUALITY) -> None:
         if cv2 is None:
             raise RuntimeError("opencv is not installed")
         if self.running:
@@ -292,7 +300,7 @@ class CameraStreamer:
         self.cap = cap
         self.device = target
         self.width, self.height, self.fps = width, height, fps
-        self.quality = max(30, min(90, quality))
+        self.quality = max(15, min(90, quality))
         self.error = ""
         self.running = True
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
@@ -450,8 +458,8 @@ def state() -> dict[str, Any]:
 
 
 @app.post("/camera/start")
-def camera_start(device: str = "", width: int = 640, height: int = 480,
-                 fps: int = 15, quality: int = 70) -> dict[str, Any]:
+def camera_start(device: str = "", width: int = CAM_WIDTH, height: int = CAM_HEIGHT,
+                 fps: int = CAM_FPS, quality: int = CAM_QUALITY) -> dict[str, Any]:
     try:
         camera.start(device=device, width=width, height=height, fps=fps, quality=quality)
     except Exception as exc:

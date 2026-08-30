@@ -19,7 +19,7 @@ EEG パイプライン（PiEEG / MQTT / TimescaleDB / LLM）には一切依存�
 
 ホーム画面に追加すると PWA としてフルスクリーン起動する。
 
-- **十字ボタン**: 押している間だけ走る。指を離すと自動で停止
+- **ジョイスティック**: 倒した方向に走る。指を離すと中央に戻って自動で停止
 - **停止**: 即時停止
 - **掃除開始 / 一時停止 / ホームへ**: Roomba OI の clean / pause / dock
 - **⚙**: シリアルポート選択・接続/切断・カメラ ON/OFF
@@ -45,6 +45,9 @@ EEG パイプライン（PiEEG / MQTT / TimescaleDB / LLM）には一切依存�
 | `ROOMBA_BAUD` | `9600` | ボーレート（`roomba.ino` と一致させる） |
 | `ROOMBA_HTTP_PORT` | `8000` | 待ち受けポート |
 | `ROOMBA_HOLD_TIMEOUT_MS` | `800` | ウォッチドッグの猶予 |
+| `ROOMBA_CAM_WIDTH` / `ROOMBA_CAM_HEIGHT` | `480` / `360` | 映像の解像度 |
+| `ROOMBA_CAM_FPS` | `8` | 映像の fps |
+| `ROOMBA_CAM_QUALITY` | `45` | JPEG 品質 (15-90) |
 
 ## HTTP API
 
@@ -79,6 +82,10 @@ sudo systemctl enable --now roomba-mobile.service
 ```
 
 ## カメラについて
+
+映像は **MJPEG**（`multipart/x-mixed-replace`）で、`<img src="/camera/stream">` がそのまま再生する。
+1 フレームが 1 枚の JPEG なので帯域は **fps × 画質** にほぼ比例する。既定は 480x360 / 8fps /
+JPEG 品質 45 と軽めに振ってある。滑らかさが欲しければ上の環境変数で上げられる。
 
 USB カメラは `/dev/video0-9` を走査して最初に読めたデバイスを使う
 （`/dev/video10` 以降は Pi 内蔵の ISP / コーデックで映像は取れない）。

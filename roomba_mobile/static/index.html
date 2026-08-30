@@ -55,19 +55,17 @@
     </section>
 
     <section class="pad" aria-label="走行操作">
-      <button class="dir up" data-cmd="forward" aria-label="前進">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l8 9h-5v7H9v-7H4z" /></svg>
-      </button>
-      <button class="dir left" data-cmd="left" aria-label="左旋回">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l9-8v5h7v6h-7v5z" /></svg>
-      </button>
-      <div class="pad-core" id="pad-core">押している間だけ<br>走ります</div>
-      <button class="dir right" data-cmd="right" aria-label="右旋回">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12l-9-8v5H4v6h7v5z" /></svg>
-      </button>
-      <button class="dir down" data-cmd="back" aria-label="後退">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20l-8-9h5V4h6v7h5z" /></svg>
-      </button>
+      <div id="stick" class="stick" role="application" tabindex="0"
+           aria-label="ジョイスティック。倒した方向に走ります">
+        <svg class="stick-hints" viewBox="0 0 200 200" aria-hidden="true">
+          <path d="M100 24l8 14h-16z" />
+          <path d="M100 176l-8-14h16z" />
+          <path d="M24 100l14-8v16z" />
+          <path d="M176 100l-14 8v-16z" />
+        </svg>
+        <div id="knob" class="knob"><span id="knob-label"></span></div>
+      </div>
+      <p class="pad-hint">倒している間だけ走ります</p>
     </section>
 
     <button id="stop" class="stop">停止</button>
