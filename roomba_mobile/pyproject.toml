@@ -1,0 +1,23 @@
+[project]
+name = "roomba-mobile"
+version = "0.1.0"
+description = "Phone-as-controller web app for the Roomba (Pi-B). No EEG, no MQTT, no DB."
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pyserial",
+    "opencv-python-headless",
+]
+
+[dependency-groups]
+dev = [
+    "httpx",
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+# `app.py` sits at the project root, not in a package; put it on the path so
+# `import app` works from tests/.
+pythonpath = ["."]
+testpaths = ["tests"]

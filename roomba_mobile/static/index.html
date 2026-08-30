@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#101418">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Roomba Controller</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icon.svg">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+  <div class="app">
+    <header class="bar">
+      <h1>Roomba</h1>
+      <span id="conn" class="conn"><i class="dot"></i><span id="conn-text">接続中…</span></span>
+      <button id="settings-btn" class="icon-btn" aria-label="設定" aria-expanded="false">⚙</button>
+    </header>
+
+    <section id="settings" class="settings" hidden>
+      <div class="field">
+        <label for="port">シリアルポート</label>
+        <div class="row">
+          <select id="port"></select>
+          <button id="reload-ports" class="btn ghost" aria-label="ポート再取得">↺</button>
+        </div>
+      </div>
+      <div class="row">
+        <button id="connect" class="btn">接続</button>
+        <button id="disconnect" class="btn ghost">切断</button>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="camera-toggle">
+        <span>カメラ映像</span>
+      </label>
+      <p id="settings-msg" class="msg"></p>
+    </section>
+
+    <section class="camera" id="camera-panel" hidden>
+      <img id="camera-feed" alt="Roomba のカメラ映像">
+      <p id="camera-msg" class="camera-msg"></p>
+    </section>
+
+    <section class="telemetry" aria-live="polite">
+      <div class="chip"><span class="chip-label">バッテリ</span><strong id="t-battery">—</strong></div>
+      <div class="chip"><span class="chip-label">充電</span><strong id="t-charge">—</strong></div>
+      <div class="chip"><span class="chip-label">バンパー</span><strong id="t-bump">—</strong></div>
+      <div class="chip"><span class="chip-label">段差</span><strong id="t-cliff">—</strong></div>
+    </section>
+
+    <section class="pad" aria-label="走行操作">
+      <button class="dir up" data-cmd="forward" aria-label="前進">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l8 9h-5v7H9v-7H4z" /></svg>
+      </button>
+      <button class="dir left" data-cmd="left" aria-label="左旋回">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l9-8v5h7v6h-7v5z" /></svg>
+      </button>
+      <div class="pad-core" id="pad-core">押している間だけ<br>走ります</div>
+      <button class="dir right" data-cmd="right" aria-label="右旋回">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12l-9-8v5H4v6h7v5z" /></svg>
+      </button>
+      <button class="dir down" data-cmd="back" aria-label="後退">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20l-8-9h5V4h6v7h5z" /></svg>
+      </button>
+    </section>
+
+    <button id="stop" class="stop">停止</button>
+
+    <section class="modes" aria-label="掃除モード">
+      <button class="btn mode" data-cmd="clean">掃除開始</button>
+      <button class="btn mode" data-cmd="pause">一時停止</button>
+      <button class="btn mode" data-cmd="dock">ホームへ</button>
+    </section>
+
+    <p id="toast" class="toast" role="status"></p>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+
+</html>

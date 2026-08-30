@@ -1,0 +1,153 @@
+/* Dark, thumb-first layout: everything the driver needs is reachable without
+   scrolling on a phone, and nothing that moves the Roomba is a small target. */
+:root {
+  --bg: #101418;
+  --panel: #191f26;
+  --panel-2: #222a33;
+  --line: #2c3540;
+  --text: #e8edf2;
+  --muted: #8b98a6;
+  --accent: #4ade80;
+  --danger: #ef4444;
+  --danger-dim: #7f1d1d;
+}
+
+* { box-sizing: border-box; }
+
+/* Panels below set an explicit `display`, which would otherwise win over the
+   browser's default rule for the `hidden` attribute. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  /* Dragging on the D-pad must steer, never scroll or pull-to-refresh. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: max(10px, env(safe-area-inset-top)) 12px max(14px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100dvh;
+}
+
+/* ---- header ---- */
+.bar { display: flex; align-items: center; gap: 10px; }
+.bar h1 { font-size: 1.05rem; margin: 0; letter-spacing: .04em; }
+
+.conn { display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: .78rem; color: var(--muted); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--danger); flex: none; }
+.conn.ok .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+.icon-btn {
+  width: 38px; height: 38px; flex: none;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel); color: var(--text); font-size: 1rem;
+}
+
+/* ---- settings ---- */
+.settings {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px; display: flex; flex-direction: column; gap: 10px;
+}
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: .75rem; color: var(--muted); }
+.row { display: flex; gap: 8px; }
+select {
+  flex: 1; min-width: 0; padding: 10px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: .9rem;
+}
+.switch { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--muted); }
+.switch input { width: 20px; height: 20px; accent-color: var(--accent); }
+.msg { margin: 0; font-size: .75rem; color: var(--muted); min-height: 1em; }
+
+.btn {
+  padding: 11px 14px; border-radius: 10px; border: 1px solid transparent;
+  background: var(--accent); color: #07130c; font-weight: 700; font-size: .9rem;
+  flex: 1;
+}
+.btn.ghost { background: var(--panel-2); color: var(--text); border-color: var(--line); font-weight: 600; }
+.btn:active { transform: translateY(1px); }
+
+/* ---- camera ---- */
+.camera { position: relative; }
+#camera-feed {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block;
+  border-radius: 12px; border: 1px solid var(--line); background: #000;
+}
+.camera-msg {
+  position: absolute; inset: 0; margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .8rem; color: var(--muted); text-align: center; padding: 12px;
+}
+.camera-msg:empty { display: none; }
+
+/* ---- telemetry ---- */
+.telemetry { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.chip {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 7px 4px; text-align: center; display: flex; flex-direction: column; gap: 2px;
+}
+.chip-label { font-size: .62rem; color: var(--muted); }
+.chip strong { font-size: .85rem; font-variant-numeric: tabular-nums; }
+.chip.alert { border-color: var(--danger); }
+.chip.alert strong { color: var(--danger); }
+
+/* ---- D-pad ---- */
+.pad {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas: ". up ." "left core right" ". down .";
+  gap: 8px;
+  /* The pad owns its gestures: no scrolling, zooming or text selection. */
+  touch-action: none;
+  user-select: none;
+  margin-top: 2px;
+}
+.up { grid-area: up; } .down { grid-area: down; }
+.left { grid-area: left; } .right { grid-area: right; }
+
+.pad-core {
+  grid-area: core;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-size: .68rem; line-height: 1.4; color: var(--muted);
+}
+
+.dir {
+  aspect-ratio: 1; width: 100%; border: 1px solid var(--line); border-radius: 18px;
+  background: var(--panel); color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  touch-action: none;
+}
+.dir svg { width: 42%; height: 42%; fill: currentColor; }
+.dir.active {
+  background: var(--accent); color: #07130c;
+  border-color: var(--accent); box-shadow: 0 0 18px rgba(74, 222, 128, .35);
+}
+.dir:disabled { opacity: .35; }
+
+/* ---- stop ---- */
+.stop {
+  width: 100%; padding: 20px; border: none; border-radius: 14px;
+  background: var(--danger); color: #fff; font-size: 1.15rem; font-weight: 800;
+  letter-spacing: .12em; box-shadow: 0 4px 0 var(--danger-dim);
+}
+.stop:active { transform: translateY(4px); box-shadow: none; }
+
+/* ---- modes ---- */
+.modes { display: flex; gap: 8px; }
+.mode { background: var(--panel-2); color: var(--text); border-color: var(--line); font-weight: 600; }
+
+/* ---- toast ---- */
+.toast {
+  margin: 0; min-height: 1.1em; text-align: center;
+  font-size: .75rem; color: var(--muted);
+}
+.toast.error { color: var(--danger); }

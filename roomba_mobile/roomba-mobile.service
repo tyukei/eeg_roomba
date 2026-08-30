@@ -1,0 +1,20 @@
+[Unit]
+Description=Roomba mobile controller (phone UI + serial bridge)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=dialout
+WorkingDirectory=/home/pi/Documents/eeg_roomba/roomba_mobile
+ExecStart=/home/pi/.local/bin/uv run --frozen python app.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+# Pi-B wires the Arduino to the GPIO UART; unset this to auto-detect instead.
+Environment=ROOMBA_SERIAL_PORT=/dev/ttyS0
+Environment=ROOMBA_HTTP_PORT=8000
+
+[Install]
+WantedBy=multi-user.target
